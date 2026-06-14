@@ -155,6 +155,35 @@ func TestConversationContentUsesStringTextPartForMultimodalMessages(t *testing.T
 	}
 }
 
+func TestParseJSONToolCalls(t *testing.T) {
+	text := `{"tool_calls":[{"tool_name":"mcp__generate_image_lucid","parameters":{"prompt":"test","width":1024,"height":1024,"num_images":1}}]}`
+	calls := parseToolCalls(text)
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 call, got %#v", calls)
+	}
+	if calls[0]["name"] != "mcp__generate_image_lucid" {
+		t.Fatalf("expected name mcp__generate_image_lucid, got %q", calls[0]["name"])
+	}
+	input, _ := calls[0]["input"].(map[string]any)
+	if input == nil {
+		t.Fatal("expected input map")
+	}
+	if strAny(input["prompt"], "") != "test" {
+		t.Fatalf("expected prompt=test, got %q", input["prompt"])
+	}
+}
+
+func TestStripJSONToolCalls(t *testing.T) {
+	text := `Some text {"tool_calls":[{"tool_name":"x"}]} more text`
+	cleaned := stripToolMarkup(text)
+	if !strings.Contains(cleaned, "Some text") || !strings.Contains(cleaned, "more text") {
+		t.Fatalf("expected cleaned text to contain prose, got %q", cleaned)
+	}
+	if strings.Contains(cleaned, "tool_calls") || strings.Contains(cleaned, "tool_name") {
+		t.Fatalf("expected tool markup removed, got %q", cleaned)
+	}
+}
+
 func TestExtractToolIDsAcceptsBareFileIDsInImageToolMessages(t *testing.T) {
 	conv := map[string]any{
 		"mapping": map[string]any{

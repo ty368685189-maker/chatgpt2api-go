@@ -703,7 +703,7 @@ func buildToolPrompt(tools any) string {
 	if len(blocks) == 0 {
 		return ""
 	}
-	return "Available tools:\n" + strings.Join(blocks, "\n") + "\n\nTool use rules:\n- If the user asks to list/read/search files, inspect project state, run a command, or answer from local code, you MUST call a suitable tool first. Do not say you cannot access files.\n- To call tools, output ONLY XML and no prose/markdown:\n<tool_calls><tool_call><tool_name>TOOL_NAME</tool_name><parameters><PARAM><![CDATA[value]]></PARAM></parameters></tool_call></tool_calls>\n- Put parameters under <parameters> using the exact schema names."
+	return "Available tools:\n" + strings.Join(blocks, "\n") + "\n\nTool use rules:\n- If the user asks to list/read/search files, inspect project state, run a command, or answer from local code, you MUST call a suitable tool first. Do not say you cannot access files.\n- To call tools, output ONLY JSON and no prose/markdown:\n{\"tool_calls\":[{\"tool_name\":\"TOOL_NAME\",\"parameters\":{\"PARAM\":\"value\"}}]}\n- Use tool_name exactly as listed. Put parameters under parameters using the exact schema names."
 }
 
 func jsonString(v any) string {
@@ -764,7 +764,7 @@ func streamableToolText(text string) (string, bool) {
 }
 
 func containsToolMarkup(text string) bool {
-	return toolMarkupIndex(text) >= 0
+	return toolMarkupIndex(text) >= 0 || toolJSONIndex(text) >= 0
 }
 
 func toolMarkupIndex(text string) int {
@@ -782,12 +782,18 @@ func toolMarkupMarkers() []string {
 	return []string{"<tool_calls", "<tool_call", "<function_call", "<invoke"}
 }
 
+func toolJSONIndex(text string) int {
+	return strings.Index(strings.ToLower(text), `"tool_calls"`)
+}
+
 func stripToolMarkup(text string) string {
 	visible, started := streamableToolText(text)
 	if started {
 		return strings.TrimSpace(visible)
 	}
-	return strings.TrimSpace(regexp.MustCompile(`(?is)<tool_calls\b[^>]*>.*?</tool_calls>|<tool_call\b[^>]*>.*?</tool_call>|<function_call\b[^>]*>.*?</function_call>|<invoke\b[^>]*>.*?</invoke>`).ReplaceAllString(text, ""))
+	cleaned := regexp.MustCompile(`(?is)<tool_calls\b[^>]*>.*?</tool_calls>|<tool_call\b[^>]*>.*?</tool_call>|<function_call\b[^>]*>.*?</function_call>|<invoke\b[^>]*>.*?</invoke>`).ReplaceAllString(text, "")
+	cleaned = stripJSONToolCalls(cleaned)
+	return strings.TrimSpace(cleaned)
 }
 
 func anthropicContentBlocks(text string, tools any) ([]map[string]any, string) {
@@ -814,26 +820,204 @@ func anthropicContentBlocks(text string, tools any) ([]map[string]any, string) {
 }
 
 func parseToolCalls(text string) []map[string]any {
-	text = regexp.MustCompile("(?is)```.*?```").ReplaceAllString(text, "")
-	blocks := toolCallBlocks(text)
+	text = stripFencedCodeBlocks(text)
 	out := []map[string]any{}
 	seen := map[string]bool{}
-	for _, block := range blocks {
-		name := firstNonEmpty(xmlValue(block, "tool_name"), xmlValue(block, "name"), xmlValue(block, "function"))
-		params := firstNonEmpty(xmlValue(block, "parameters"), xmlValue(block, "input"), xmlValue(block, "arguments"), "{}")
+	appendCall := func(name string, input map[string]any) {
+		name = strings.TrimSpace(name)
 		if name == "" {
-			continue
+			return
 		}
-		input := parseToolParams(params)
+		if input == nil {
+			input = map[string]any{}
+		}
 		keyBytes, _ := json.Marshal(map[string]any{"name": name, "input": input})
 		key := string(keyBytes)
 		if seen[key] {
-			continue
+			return
 		}
 		seen[key] = true
 		out = append(out, map[string]any{"name": name, "input": input})
 	}
+	for _, call := range parseJSONToolCalls(text) {
+		appendCall(strAny(call["name"], ""), mapAny(call["input"]))
+	}
+	for _, block := range toolCallBlocks(text) {
+		name := firstNonEmpty(xmlValue(block, "tool_name"), xmlValue(block, "name"), xmlValue(block, "function"))
+		params := firstNonEmpty(xmlValue(block, "parameters"), xmlValue(block, "input"), xmlValue(block, "arguments"), "{}")
+		appendCall(name, parseToolParams(params))
+	}
 	return out
+}
+
+func stripFencedCodeBlocks(text string) string {
+	return regexp.MustCompile("(?is)```.*?```").ReplaceAllString(text, "")
+}
+
+func parseJSONToolCalls(text string) []map[string]any {
+	spans := jsonToolCallSpans(text)
+	out := []map[string]any{}
+	for _, span := range spans {
+		var payload map[string]any
+		if json.Unmarshal([]byte(span), &payload) != nil {
+			continue
+		}
+		items, ok := payload["tool_calls"].([]any)
+		if !ok {
+			continue
+		}
+		for _, raw := range items {
+			item, ok := raw.(map[string]any)
+			if !ok {
+				continue
+			}
+			name := firstNonEmpty(strAny(item["tool_name"], ""), strAny(item["name"], ""))
+			input := mapAny(firstNonEmptyAny(item["parameters"], item["arguments"], item["input"]))
+			if input == nil {
+				input = parseToolArgumentValue(firstNonEmptyAny(item["parameters"], item["arguments"], item["input"]))
+			}
+			out = append(out, map[string]any{"name": name, "input": input})
+		}
+	}
+	return out
+}
+
+func stripJSONToolCalls(text string) string {
+	spans := jsonToolCallSpansWithBounds(text)
+	if len(spans) == 0 {
+		return text
+	}
+	var b strings.Builder
+	last := 0
+	for _, span := range spans {
+		if span.start < last || span.end > len(text) {
+			continue
+		}
+		b.WriteString(text[last:span.start])
+		last = span.end
+	}
+	b.WriteString(text[last:])
+	return b.String()
+}
+
+type textSpan struct {
+	start int
+	end   int
+}
+
+func jsonToolCallSpans(text string) []string {
+	bounds := jsonToolCallSpansWithBounds(text)
+	out := make([]string, 0, len(bounds))
+	for _, span := range bounds {
+		out = append(out, text[span.start:span.end])
+	}
+	return out
+}
+
+func jsonToolCallSpansWithBounds(text string) []textSpan {
+	out := []textSpan{}
+	lower := strings.ToLower(text)
+	searchFrom := 0
+	for {
+		idx := strings.Index(lower[searchFrom:], `"tool_calls"`)
+		if idx < 0 {
+			break
+		}
+		idx += searchFrom
+		start := strings.LastIndex(text[:idx], "{")
+		if start < 0 {
+			searchFrom = idx + len(`"tool_calls"`)
+			continue
+		}
+		end := matchingJSONEnd(text, start)
+		if end < 0 {
+			searchFrom = idx + len(`"tool_calls"`)
+			continue
+		}
+		candidate := text[start:end]
+		var payload map[string]any
+		if json.Unmarshal([]byte(candidate), &payload) == nil {
+			if _, ok := payload["tool_calls"]; ok {
+				out = append(out, textSpan{start: start, end: end})
+				searchFrom = end
+				continue
+			}
+		}
+		searchFrom = idx + len(`"tool_calls"`)
+	}
+	return out
+}
+
+func matchingJSONEnd(text string, start int) int {
+	if start < 0 || start >= len(text) || text[start] != '{' {
+		return -1
+	}
+	depth := 0
+	inString := false
+	escaped := false
+	for i := start; i < len(text); i++ {
+		ch := text[i]
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if ch == '\\' {
+				escaped = true
+				continue
+			}
+			if ch == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch ch {
+		case '"':
+			inString = true
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return -1
+}
+
+func firstNonEmptyAny(values ...any) any {
+	for _, value := range values {
+		if strings.TrimSpace(strAny(value, "")) != "" {
+			return value
+		}
+		if m, ok := value.(map[string]any); ok && len(m) > 0 {
+			return m
+		}
+	}
+	return nil
+}
+
+func mapAny(value any) map[string]any {
+	if m, ok := value.(map[string]any); ok {
+		return m
+	}
+	return nil
+}
+
+func parseToolArgumentValue(value any) map[string]any {
+	if value == nil {
+		return nil
+	}
+	s := strings.TrimSpace(strAny(value, ""))
+	if s == "" {
+		return nil
+	}
+	var obj map[string]any
+	if json.Unmarshal([]byte(s), &obj) == nil {
+		return obj
+	}
+	return nil
 }
 
 func toolCallBlocks(text string) []string {
