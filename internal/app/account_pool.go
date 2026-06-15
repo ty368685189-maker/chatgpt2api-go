@@ -118,11 +118,23 @@ func (p *accountPool) pickTextTokenExcluding(accounts []Account, planType string
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	premium := map[string]bool{"plus": true, "pro": true, "team": true}
+	now := time.Now().UTC()
 	for offset := 0; offset < len(accounts); offset++ {
 		idx := (p.index + offset) % len(accounts)
 		a := accounts[idx]
 		if a.AccessToken == "" || excluded[a.AccessToken] || a.Status == "禁用" || a.Status == "异常" {
 			continue
+		}
+		if a.Status == "限流" {
+			resetAt := firstNonEmpty(ptrString(a.RateLimitResetAt), ptrString(a.RestoreAt))
+			if resetAt != "" {
+				rt, err := parseAccountTime(resetAt)
+				if err != nil || now.Before(rt) {
+					continue
+				}
+			} else {
+				continue
+			}
 		}
 		lower := strings.ToLower(a.Type)
 		if planType == "free" {

@@ -19,6 +19,9 @@ const adminNavItems = [
   { href: "/logs", label: "日志管理" },
   { href: "/settings", label: "设置" },
   { href: "/keys", label: "用户密钥" },
+  { href: "/invites", label: "邀请码" },
+  { href: "/users", label: "注册用户" },
+  { href: "/announcement", label: "📢 公告" },
 ];
 
 const userNavItems = [
@@ -26,6 +29,7 @@ const userNavItems = [
   { href: "/image", label: "画图" },
   { href: "/works", label: "我的作品" },
   { href: "/gallery", label: "画廊" },
+  { href: "/announcement", label: "📢 公告" },
 ];
 
 // next.config.ts 配了 trailingSlash: true，usePathname 返回 "/image/"，
@@ -131,7 +135,7 @@ export function TopNav() {
     };
   }, [pathname, session]);
 
-  if (pathname === "/login" || session === undefined || !session) {
+  if (pathname === "/login" || pathname === "/register" || session === undefined || !session) {
     return null;
   }
 
@@ -153,18 +157,12 @@ export function TopNav() {
     <header className="fixed top-0 right-0 left-0 z-40 bg-background/25 backdrop-blur-[28px] backdrop-saturate-150">
       <div className="mx-auto flex h-12 max-w-[1440px] items-center gap-3 px-4 sm:h-14 sm:gap-4 sm:px-6 lg:px-8">
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <Link href="/chat" className="group flex shrink-0 -translate-y-[1px] items-center py-1">
+          <Link href="/image" className="group flex shrink-0 -translate-y-[1px] items-center py-1">
             <span className="text-[20px] font-bold leading-none tracking-[-0.025em] text-foreground">
-              Chat
+              Dual
             </span>
-            <span className="text-[20px] font-extrabold leading-none tracking-[-0.025em] text-foreground">
-              GPT
-            </span>
-            <span className="ml-[2px] font-data text-[13px] font-semibold leading-none text-muted-foreground/70">
-              2
-            </span>
-            <span className="ml-[2px] font-data text-[16px] font-bold leading-none tracking-[0.02em] text-foreground/85">
-              API
+            <span className="ml-2 text-[14px] font-medium leading-none tracking-[0.02em] text-muted-foreground/80">
+              公益站
             </span>
           </Link>
           <span className="hidden h-5 w-px bg-border lg:block" />

@@ -84,8 +84,16 @@ func (s *Server) refreshOAuthAccessToken(ctx context.Context, oldToken string) (
 			account.AccountID = &accountID
 		}
 	}
-	accounts[idx] = account
-	_ = s.store.SaveAccounts(accounts)
+	s.accMu.Lock()
+	latest := s.store.LoadAccounts()
+	for i, a := range latest {
+		if a.AccessToken == oldToken {
+			latest[i] = account
+			break
+		}
+	}
+	_ = s.store.SaveAccounts(latest)
+	s.accMu.Unlock()
 	return newToken, nil
 }
 

@@ -49,6 +49,7 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, 400, "tokens or account_records is required")
 			return
 		}
+		s.accMu.Lock()
 		accounts := s.store.LoadAccounts()
 		existing := map[string]int{}
 		for i, a := range accounts {
@@ -68,6 +69,7 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		_ = s.store.SaveAccounts(accounts)
+		s.accMu.Unlock()
 		refreshed, errs := s.refreshAccountInfos(r.Context(), keysOf(tokset))
 		accounts = s.store.LoadAccounts()
 		s.logSvc.add("account", "新增账号", map[string]any{"added": added, "skipped": skipped, "refreshed": refreshed})
@@ -86,6 +88,7 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 				targets[strings.TrimSpace(t)] = true
 			}
 		}
+		s.accMu.Lock()
 		accounts := s.store.LoadAccounts()
 		out := []Account{}
 		removed := 0
@@ -97,6 +100,7 @@ func (s *Server) handleAccounts(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		_ = s.store.SaveAccounts(out)
+		s.accMu.Unlock()
 		writeJSON(w, 200, map[string]any{"removed": removed, "mailboxes_removed": 0, "mailbox_errors": []any{}, "items": out})
 	default:
 		writeErr(w, 405, "method not allowed")
@@ -260,7 +264,8 @@ func (s *Server) refreshAccountInfos(parent context.Context, tokens []string) (i
 	accounts := s.store.LoadAccounts()
 	refreshed := 0
 	errs := []map[string]any{}
-	for i, a := range accounts {
+	updates := map[string]Account{}
+	for _, a := range accounts {
 		if len(want) > 0 && !want[a.AccessToken] {
 			continue
 		}
@@ -270,9 +275,7 @@ func (s *Server) refreshAccountInfos(parent context.Context, tokens []string) (i
 			var info Account
 			info, err = client.GetUserInfo(ctx)
 			if err == nil {
-				mergeAccount(&a, info)
-				a.AccessToken = accounts[i].AccessToken
-				accounts[i] = a
+				updates[a.AccessToken] = info
 				refreshed++
 			}
 		}
@@ -281,7 +284,19 @@ func (s *Server) refreshAccountInfos(parent context.Context, tokens []string) (i
 			errs = append(errs, map[string]any{"token": a.AccessToken, "error": err.Error()})
 		}
 	}
-	_ = s.store.SaveAccounts(accounts)
+	if len(updates) > 0 {
+		s.accMu.Lock()
+		defer s.accMu.Unlock()
+		latest := s.store.LoadAccounts()
+		for i, a := range latest {
+			if info, ok := updates[a.AccessToken]; ok {
+				mergeAccount(&a, info)
+				a.AccessToken = latest[i].AccessToken
+				latest[i] = a
+			}
+		}
+		_ = s.store.SaveAccounts(latest)
+	}
 	return refreshed, errs
 }
 
@@ -325,6 +340,7 @@ func (s *Server) handleAccountsUpdate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "access_token is required")
 		return
 	}
+	s.accMu.Lock()
 	accounts := s.store.LoadAccounts()
 	for i, a := range accounts {
 		if a.AccessToken == token {
@@ -339,9 +355,11 @@ func (s *Server) handleAccountsUpdate(w http.ResponseWriter, r *http.Request) {
 			}
 			accounts[i] = a
 			_ = s.store.SaveAccounts(accounts)
+			s.accMu.Unlock()
 			writeJSON(w, 200, map[string]any{"item": a, "items": accounts})
 			return
 		}
 	}
+	s.accMu.Unlock()
 	writeErr(w, 404, "account not found")
 }

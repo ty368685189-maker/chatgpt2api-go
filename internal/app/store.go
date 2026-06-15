@@ -12,13 +12,65 @@ import (
 )
 
 type Store struct {
-	dir string
-	mu  sync.RWMutex
+	dir              string
+	mu               sync.RWMutex
+	accountsCache    []Account
+	authKeysCache    []UserKey
+	inviteCodesCache []InviteCode
+	usersCache       []LocalUser
+	cacheLoaded      bool
 }
 
 func NewStore(dir string) *Store {
 	_ = os.MkdirAll(dir, 0755)
-	return &Store{dir: dir}
+	s := &Store{dir: dir}
+	s.loadAllToCache()
+	return s
+}
+
+func (s *Store) loadAllToCache() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// load accounts
+	accounts := readJSONFile(s.path("accounts.json"), []Account{})
+	s.accountsCache = make([]Account, 0, len(accounts))
+	for _, a := range accounts {
+		if a.AccessToken == "" {
+			continue
+		}
+		if a.Type == "" {
+			a.Type = "free"
+		}
+		if a.Status == "" {
+			a.Status = "正常"
+		}
+		if a.SourceType == "" {
+			a.SourceType = "web"
+		}
+		if a.InitialQuota < a.Quota {
+			a.InitialQuota = a.Quota
+		}
+		s.accountsCache = append(s.accountsCache, a)
+	}
+
+	// load auth keys
+	path := s.path("auth_keys.json")
+	wrap := readJSONFile(path, authKeysWrap{})
+	if len(wrap.Items) > 0 {
+		s.authKeysCache = normalizeKeys(wrap.Items)
+	} else {
+		arr := readJSONFile(path, []UserKey{})
+		s.authKeysCache = normalizeKeys(arr)
+	}
+
+	// load invite codes
+	s.inviteCodesCache = readJSONFile(s.path("invite_codes.json"), []InviteCode{})
+
+	// load users
+	s.usersCache = readJSONFile(s.path("users.json"), []LocalUser{})
+
+	s.cacheLoaded = true
 }
 
 func (s *Store) path(name string) string { return filepath.Join(s.dir, name) }
@@ -54,30 +106,17 @@ func writeJSONFile(path string, value any) error {
 func (s *Store) LoadAccounts() []Account {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	items := readJSONFile(s.path("accounts.json"), []Account{})
-	out := make([]Account, 0, len(items))
-	for _, a := range items {
-		if a.AccessToken == "" {
-			continue
-		}
-		if a.Type == "" {
-			a.Type = "free"
-		}
-		if a.Status == "" {
-			a.Status = "正常"
-		}
-		if a.SourceType == "" {
-			a.SourceType = "web"
-		}
-		if a.InitialQuota < a.Quota {
-			a.InitialQuota = a.Quota
-		}
-		out = append(out, a)
-	}
+	out := make([]Account, len(s.accountsCache))
+	copy(out, s.accountsCache)
 	return out
 }
 
 func (s *Store) SaveAccounts(items []Account) error {
+	s.mu.Lock()
+	s.accountsCache = make([]Account, len(items))
+	copy(s.accountsCache, items)
+	s.mu.Unlock()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return writeJSONFile(s.path("accounts.json"), items)
@@ -90,19 +129,65 @@ type authKeysWrap struct {
 func (s *Store) LoadAuthKeys() []UserKey {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	path := s.path("auth_keys.json")
-	wrap := readJSONFile(path, authKeysWrap{})
-	if len(wrap.Items) > 0 {
-		return normalizeKeys(wrap.Items)
-	}
-	arr := readJSONFile(path, []UserKey{})
-	return normalizeKeys(arr)
+	out := make([]UserKey, len(s.authKeysCache))
+	copy(out, s.authKeysCache)
+	return out
 }
 
 func (s *Store) SaveAuthKeys(items []UserKey) error {
 	s.mu.Lock()
+	s.authKeysCache = make([]UserKey, len(items))
+	copy(s.authKeysCache, items)
+	s.mu.Unlock()
+
+	s.mu.Lock()
 	defer s.mu.Unlock()
 	return writeJSONFile(s.path("auth_keys.json"), authKeysWrap{Items: items})
+}
+
+func (s *Store) UpdateAuthKeysCacheOnly(items []UserKey) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.authKeysCache = make([]UserKey, len(items))
+	copy(s.authKeysCache, items)
+}
+
+func (s *Store) LoadInviteCodes() []InviteCode {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]InviteCode, len(s.inviteCodesCache))
+	copy(out, s.inviteCodesCache)
+	return out
+}
+
+func (s *Store) SaveInviteCodes(items []InviteCode) error {
+	s.mu.Lock()
+	s.inviteCodesCache = make([]InviteCode, len(items))
+	copy(s.inviteCodesCache, items)
+	s.mu.Unlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return writeJSONFile(s.path("invite_codes.json"), items)
+}
+
+func (s *Store) LoadUsers() []LocalUser {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]LocalUser, len(s.usersCache))
+	copy(out, s.usersCache)
+	return out
+}
+
+func (s *Store) SaveUsers(items []LocalUser) error {
+	s.mu.Lock()
+	s.usersCache = make([]LocalUser, len(items))
+	copy(s.usersCache, items)
+	s.mu.Unlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return writeJSONFile(s.path("users.json"), items)
 }
 
 func (s *Store) LoadGallery() []GalleryItem {

@@ -41,6 +41,7 @@ func (c *curlImpersonateClient) Do(req *http.Request) (*http.Response, error) {
 		"--silent",
 		"--show-error",
 		"--no-progress-meter",
+		"--no-buffer",
 		"--compressed",
 		"--http2",
 		"--dump-header", "-",
@@ -50,7 +51,7 @@ func (c *curlImpersonateClient) Do(req *http.Request) (*http.Response, error) {
 		args = append(args, "--proxy", c.proxyURL)
 	}
 	for key, values := range req.Header {
-		if strings.EqualFold(key, http.HeaderOrderKey) {
+		if strings.EqualFold(key, http.HeaderOrderKey) || strings.EqualFold(key, "Content-Length") {
 			continue
 		}
 		for _, value := range values {
@@ -61,6 +62,7 @@ func (c *curlImpersonateClient) Do(req *http.Request) (*http.Response, error) {
 		}
 	}
 	if len(bodyBytes) > 0 || req.Method == http.MethodPost || req.Method == http.MethodPut || req.Method == http.MethodPatch {
+		args = append(args, "--header", fmt.Sprintf("Content-Length: %d", len(bodyBytes)))
 		args = append(args, "--data-binary", "@-")
 	}
 	args = append(args, req.URL.String())

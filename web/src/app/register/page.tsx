@@ -1,27 +1,170 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { LoaderCircle, UserPlus } from "lucide-react";
+import { toast } from "sonner";
+import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
-import { useAuthGuard } from "@/lib/use-auth-guard";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { login, registerUser, fetchSystemPublicConfig } from "@/lib/api";
+import { primeAuthSessionCache } from "@/lib/auth-session";
+import { useRedirectIfAuthenticated } from "@/lib/use-auth-guard";
+import { getDefaultRouteForRole, setStoredAuthSession } from "@/store/auth";
 
 export default function RegisterPage() {
-  const { isCheckingAuth, session } = useAuthGuard(["admin"]);
+  const router = useRouter();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [siteKey, setSiteKey] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { isCheckingAuth } = useRedirectIfAuthenticated();
 
-  if (isCheckingAuth || !session || session.role !== "admin") {
+  useEffect(() => {
+    fetchSystemPublicConfig().then((res) => {
+      if (res.turnstile_site_key) {
+        setSiteKey(res.turnstile_site_key);
+      }
+    }).catch(console.error);
+  }, []);
+
+  const handleRegister = async () => {
+    if (!username.trim() || !password.trim()) {
+      toast.error("请输入用户名和密码");
+      return;
+    }
+    if (!inviteCode.trim()) {
+      toast.error("请输入邀请码");
+      return;
+    }
+    if (password.length < 6) {
+      toast.error("密码至少 6 个字符");
+      return;
+    }
+    if (siteKey && !turnstileToken) {
+      toast.error("请先完成人机验证");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await registerUser({
+        username: username.trim(),
+        password: password.trim(),
+        invite_code: inviteCode.trim(),
+        turnstile_token: turnstileToken,
+      });
+      // 注册成功，用返回的 key 自动登录
+      const data = await login(res.key);
+      const nextSession = {
+        key: res.key,
+        role: data.role,
+        subjectId: data.subject_id,
+        name: data.name,
+      };
+      await setStoredAuthSession(nextSession);
+      primeAuthSessionCache(nextSession);
+      toast.success("注册成功！");
+      router.replace(getDefaultRouteForRole(data.role));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "注册失败";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isCheckingAuth) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
+      <div className="grid min-h-[calc(100vh-1rem)] w-full place-items-center px-4 py-6">
         <LoaderCircle className="size-5 animate-spin text-stone-400" />
       </div>
     );
   }
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-12">
-      <p className="text-xs font-semibold uppercase tracking-[0.28em] text-stone-400">Disabled Feature</p>
-      <h1 className="text-3xl font-semibold tracking-tight text-stone-950">注册机已移除</h1>
-      <p className="text-sm leading-6 text-stone-500">
-        Go 版本按当前部署要求不再包含注册机功能。请在「号池管理」中手动导入已有账号。
-      </p>
-    </main>
+    <div className="grid min-h-[calc(100vh-1rem)] w-full place-items-center px-4 py-6">
+      <Card className="w-full max-w-[400px] rounded-[30px] border-white/80 bg-white/95 shadow-[0_28px_90px_rgba(28,25,23,0.10)]">
+        <CardContent className="space-y-6 p-6 sm:p-8">
+          <div className="space-y-4 text-center">
+            <div className="mx-auto inline-flex size-14 items-center justify-center rounded-[18px] bg-stone-950 text-white shadow-sm">
+              <UserPlus className="size-5" />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-3xl font-semibold tracking-tight text-stone-950">
+                加入 Dual 公益站
+              </h1>
+              <p className="text-sm leading-6 text-stone-500">
+                输入邀请码注册，获取免费画图额度。
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-stone-700">邀请码</label>
+              <Input
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="请输入邀请码"
+                className="h-12 rounded-2xl border-stone-200 bg-white px-4"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-stone-700">用户名</label>
+              <Input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="请输入用户名"
+                className="h-12 rounded-2xl border-stone-200 bg-white px-4"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-stone-700">密码</label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleRegister();
+                }}
+                placeholder="请输入密码（至少6位）"
+                className="h-12 rounded-2xl border-stone-200 bg-white px-4"
+              />
+            </div>
+          </div>
+
+          {siteKey ? (
+            <div className="flex justify-center py-2">
+              <Turnstile
+                siteKey={siteKey}
+                onSuccess={(token) => setTurnstileToken(token)}
+                onError={() => toast.error("人机验证加载失败")}
+                onExpire={() => setTurnstileToken("")}
+              />
+            </div>
+          ) : null}
+
+          <Button
+            className="h-12 w-full rounded-2xl bg-stone-950 text-white hover:bg-stone-800"
+            onClick={() => void handleRegister()}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <LoaderCircle className="size-4 animate-spin mr-2" /> : null}
+            注册
+          </Button>
+
+          <div className="text-center text-sm">
+            <a href="/login" className="text-stone-500 hover:text-stone-900 transition-colors">
+              已有账号？返回登录
+            </a>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

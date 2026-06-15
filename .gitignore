@@ -31,3 +31,12 @@ AGENTS.md
 
 # Git cache
 git_cache/
+
+# Go-generated files and SDKs
+chat2api.exe
+chat2api.exe~
+server
+go.zip
+go_dist/
+*.bak
+web_dist.bak/

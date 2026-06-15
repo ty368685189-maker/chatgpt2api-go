@@ -106,7 +106,11 @@ export function NetworkSection() {
         placeholder="http://127.0.0.1:7890"
         className={INPUT_CLASS}
       />
-      <p className={HELP_CLASS}>留空表示不使用代理。代理同时影响生图请求和上游 OpenAI 转发。</p>
+      <p className={HELP_CLASS}>
+        留空表示不使用代理。代理同时影响生图请求和上游 OpenAI 转发。
+        <br />
+        <span className="text-amber-600 font-medium">修改后，请务必点击页面最下方的「保存更改」按钮使其生效。</span>
+      </p>
       {proxyTestResult ? (
         <div
           className={`rounded-xl border px-3 py-2 text-xs leading-6 ${
@@ -180,6 +184,50 @@ export function ImageSection() {
             className={INPUT_CLASS}
           />
           <p className={HELP_CLASS}>限制每个账号同时处理的图片请求数量。</p>
+        </div>
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>免费用户并发</label>
+          <Input
+            value={String(config?.free_image_concurrency || "")}
+            onChange={(e) => useSettingsStore.getState().setFreeImageConcurrency(e.target.value)}
+            placeholder="1"
+            className={INPUT_CLASS}
+          />
+          <p className={HELP_CLASS}>限制免费用户同时进行的最大生图任务数。</p>
+        </div>
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>赞助用户并发</label>
+          <Input
+            value={String(config?.premium_image_concurrency || "")}
+            onChange={(e) => useSettingsStore.getState().setPremiumImageConcurrency(e.target.value)}
+            placeholder="3"
+            className={INPUT_CLASS}
+          />
+          <p className={HELP_CLASS}>限制VIP或赞助用户同时进行的最大生图任务数。</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>Turnstile Site Key (防刷)</label>
+          <Input
+            value={config?.turnstile_site_key || ""}
+            onChange={(e) => useSettingsStore.getState().setTurnstileSiteKey(e.target.value)}
+            placeholder="1x00000000000000000000AA"
+            className={INPUT_CLASS}
+          />
+          <p className={HELP_CLASS}>在 Cloudflare 申请的站点密钥。留空表示关闭验证。</p>
+        </div>
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>Turnstile Secret Key</label>
+          <Input
+            value={config?.turnstile_secret_key || ""}
+            onChange={(e) => useSettingsStore.getState().setTurnstileSecretKey(e.target.value)}
+            placeholder="1x0000000000000000000000000000000AA"
+            type="password"
+            className={INPUT_CLASS}
+          />
+          <p className={HELP_CLASS}>用于后端验证的私钥。</p>
         </div>
       </div>
 
@@ -344,6 +392,77 @@ export function LogSection() {
             {level}
           </label>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────── 公告 ───────────────────────── */
+
+export function AnnouncementSection() {
+  const config = useSettingsStore((s) => s.config);
+  const setAnnouncement = useSettingsStore((s) => s.setAnnouncement);
+
+  const ann = config?.announcement || {
+    version: 1,
+    title: "",
+    items: [],
+    qq_group: { number: "", image: "" },
+    github: { url: "", author: "" },
+  };
+
+  const updateAnn = (updates: Partial<typeof ann>) => {
+    setAnnouncement({ ...ann, ...updates } as any);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>公告版本号</label>
+          <Input
+            type="number"
+            value={String(ann.version)}
+            onChange={(e) => updateAnn({ version: parseInt(e.target.value) || 1 })}
+            className={INPUT_CLASS}
+          />
+          <p className={HELP_CLASS}>更改版本号会强制所有用户重新弹出公告。</p>
+        </div>
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>公告标题</label>
+          <Input
+            value={ann.title}
+            onChange={(e) => updateAnn({ title: e.target.value })}
+            className={INPUT_CLASS}
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <label className={LABEL_CLASS}>公告内容（每行一条）</label>
+        <Textarea
+          rows={6}
+          value={ann.items.join("\n")}
+          onChange={(e) => updateAnn({ items: e.target.value.split("\n").filter((s) => s.trim()) })}
+          className="rounded-xl border-stone-200 bg-white"
+        />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>QQ 群号</label>
+          <Input
+            value={ann.qq_group?.number || ""}
+            onChange={(e) => updateAnn({ qq_group: { ...ann.qq_group, number: e.target.value } as any })}
+            className={INPUT_CLASS}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className={LABEL_CLASS}>QQ 群二维码路径</label>
+          <Input
+            value={ann.qq_group?.image || ""}
+            onChange={(e) => updateAnn({ qq_group: { ...ann.qq_group, image: e.target.value } as any })}
+            className={INPUT_CLASS}
+          />
+        </div>
       </div>
     </div>
   );

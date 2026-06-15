@@ -22,14 +22,15 @@ func (s *Server) generateImageWithPool(ctx context.Context, prompt, model, size,
 			}
 			return nil, err
 		}
+		token := account.AccessToken
 		client, err := s.upstreamClientForImageAccount(model, resolution, account)
 		if err != nil {
+			s.accountPool.releaseToken(token)
 			if lastErr != nil {
 				return nil, lastErr
 			}
 			return nil, err
 		}
-		token := account.AccessToken
 		traceLogf(ctx, "│  ├─ selected image account %s", accountLabel(account))
 		excluded[token] = true
 		items, err := client.GenerateImage(ctx, prompt, model, size, resolution, refs)

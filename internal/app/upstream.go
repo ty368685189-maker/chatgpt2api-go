@@ -498,14 +498,19 @@ func (c *UpstreamClient) GenerateImage(ctx context.Context, prompt, model, size,
 			return nil, errors.New("image generation SSE timed out (120s)")
 		}
 	}
-	if message != "" && len(fileIDs) == 0 && len(sedimentIDs) == 0 && (state.Blocked || state.ToolInvoked == false || state.TurnUseCase == "text") {
+	if message != "" && len(state.FileIDs) == 0 && len(state.SedimentIDs) == 0 && (state.Blocked || state.ToolInvoked == false || state.TurnUseCase == "text") {
 		return nil, errors.New(cleanImageMessage(message))
 	}
 	if cid != "" && !isImageQuotaMessage(message) {
-		traceLogf(ctx, "│  ├─ step poll final image tool records conversation=%s", maskedValue(cid))
-		f, s := c.pollImageIDs(ctx, cid, 120*time.Second)
-		fileIDs = append(fileIDs, f...)
-		sedimentIDs = append(sedimentIDs, s...)
+		if len(state.FileIDs) > 0 || len(state.SedimentIDs) > 0 {
+			fileIDs = append(fileIDs, state.FileIDs...)
+			sedimentIDs = append(sedimentIDs, state.SedimentIDs...)
+		} else {
+			traceLogf(ctx, "│  ├─ step poll final image tool records conversation=%s", maskedValue(cid))
+			f, s := c.pollImageIDs(ctx, cid, 120*time.Second)
+			fileIDs = append(fileIDs, f...)
+			sedimentIDs = append(sedimentIDs, s...)
+		}
 	}
 	traceLogf(ctx, "│  ├─ step resolve image download URLs file_ids=%d sediment_ids=%d", len(fileIDs), len(sedimentIDs))
 	urls, err := c.resolveImageURLs(ctx, cid, fileIDs, sedimentIDs)
@@ -1633,16 +1638,62 @@ func (s *Server) upstreamClientForImageExcluding(model, resolution string, exclu
 	}
 	return s.upstreamClientForImageAccount(model, resolution, account)
 }
+func (a *Account) IsTokenExpired() bool {
+	if a.ExpiresAt == nil {
+		return true
+	}
+	var expires int64
+	switch v := a.ExpiresAt.(type) {
+	case int64:
+		expires = v
+	case float64:
+		expires = int64(v)
+	case int:
+		expires = int64(v)
+	default:
+		return true
+	}
+	return time.Now().Unix() >= expires-300
+}
 
 func (s *Server) upstreamClientForImageAccount(model, resolution string, account Account) (*UpstreamClient, error) {
 	if isCodexImageRequest(model, resolution) {
-		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
-		defer cancel()
-		if refreshed, err := s.refreshOAuthAccessToken(ctx, account.AccessToken); err == nil && refreshed != "" {
-			account.AccessToken = refreshed
+		if account.IsTokenExpired() {
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			if refreshed, err := s.refreshOAuthAccessToken(ctx, account.AccessToken); err == nil && refreshed != "" {
+				account.AccessToken = refreshed
+			}
 		}
 	}
 	return NewUpstreamClientForAccount(account, s.cfg.Proxy, s.ensureCurlImpersonateBinary)
+}
+
+func (s *Server) testProxyConnection(ctx context.Context, proxyStr string) (bool, int, string, int64) {
+	client, err := NewUpstreamClient("", proxyStr, s.ensureCurlImpersonateBinary)
+	if err != nil {
+		return false, 0, err.Error(), 0
+	}
+
+	target := chatGPTBaseURL + "/api/auth/csrf"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return false, 0, err.Error(), 0
+	}
+
+	req.Header = client.headers("/api/auth/csrf", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (chatgpt2api proxy test)")
+
+	start := time.Now()
+	resp, err := client.client.Do(req)
+	latency := time.Since(start).Milliseconds()
+	if err != nil {
+		return false, 0, err.Error(), latency
+	}
+	defer resp.Body.Close()
+
+	ok := resp.StatusCode > 0 && resp.StatusCode < 500
+	return ok, resp.StatusCode, resp.Status, latency
 }
 
 func init() { rand.Seed(time.Now().UnixNano()) }

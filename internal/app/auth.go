@@ -74,6 +74,8 @@ func (s *Server) requireIdentity(w http.ResponseWriter, r *http.Request) (*Ident
 	if token == s.cfg.AuthKey {
 		return &Identity{ID: "admin", Name: "管理员", Role: "admin", AccountTier: "premium", CanUsePaidImageAccounts: true, CanUseHighResolution: true}, true
 	}
+	s.authMu.Lock()
+	defer s.authMu.Unlock()
 	keys := s.store.LoadAuthKeys()
 	h := hashKey(token)
 	for i, k := range keys {
@@ -82,8 +84,24 @@ func (s *Server) requireIdentity(w http.ResponseWriter, r *http.Request) (*Ident
 		}
 		if k.KeyHash != "" && subtle.ConstantTimeCompare([]byte(k.KeyHash), []byte(h)) == 1 {
 			now := nowISO()
+			differsSignificantly := false
+			if k.LastUsedAt == nil {
+				differsSignificantly = true
+			} else {
+				if t, err := time.Parse(time.RFC3339Nano, *k.LastUsedAt); err == nil {
+					if time.Since(t) > 5*time.Minute {
+						differsSignificantly = true
+					}
+				} else {
+					differsSignificantly = true
+				}
+			}
 			keys[i].LastUsedAt = &now
-			_ = s.store.SaveAuthKeys(keys)
+			if differsSignificantly {
+				_ = s.store.SaveAuthKeys(keys)
+			} else {
+				s.store.UpdateAuthKeysCacheOnly(keys)
+			}
 			prem := k.AccountTier == "premium"
 			return &Identity{ID: k.ID, Name: k.Name, Role: k.Role, AccountTier: k.AccountTier, CanUsePaidImageAccounts: prem || k.Role == "admin", CanUseHighResolution: prem || k.Role == "admin"}, true
 		}
@@ -197,9 +215,11 @@ func (s *Server) handleAuthUsers(w http.ResponseWriter, r *http.Request) {
 			tier = "free"
 		}
 		k := UserKey{ID: randID(6), Name: strings.TrimSpace(strAny(body["name"], "普通用户")), Role: role, KeyHash: hashKey(raw), Key: raw, AccountTier: tier, Enabled: true, CreatedAt: nowISO(), ImageDailyQuota: intAny(body["image_daily_quota"], 0), ImageDailyUnlimited: boolAny(body["image_daily_unlimited"], true), ImageMonthlyQuota: intAny(body["image_monthly_quota"], 0), ImageMonthlyUnlimited: boolAny(body["image_monthly_unlimited"], true), ImageTotalQuota: intAny(body["image_total_quota"], 0), ImageTotalUnlimited: boolAny(body["image_total_unlimited"], false), ChatDailyQuota: intAny(body["chat_daily_quota"], 0), ChatDailyUnlimited: boolAny(body["chat_daily_unlimited"], true), ChatMonthlyQuota: intAny(body["chat_monthly_quota"], 0), ChatMonthlyUnlimited: boolAny(body["chat_monthly_unlimited"], true), ChatTotalQuota: intAny(body["chat_total_quota"], 0), ChatTotalUnlimited: boolAny(body["chat_total_unlimited"], true), ImageDailyResetAt: todayKey(), ImageMonthlyResetAt: monthKey(), ChatDailyResetAt: todayKey(), ChatMonthlyResetAt: monthKey()}
+		s.authMu.Lock()
 		keys := s.store.LoadAuthKeys()
 		keys = append(keys, k)
 		_ = s.store.SaveAuthKeys(keys)
+		s.authMu.Unlock()
 		items := []map[string]any{}
 		for _, it := range keys {
 			if it.Role == "user" {
@@ -223,6 +243,8 @@ func (s *Server) handleAuthUserID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := parts[0]
+	s.authMu.Lock()
+	defer s.authMu.Unlock()
 	keys := s.store.LoadAuthKeys()
 	idx := -1
 	for i, k := range keys {
@@ -256,8 +278,24 @@ func (s *Server) handleAuthUserID(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodDelete:
+		keyToDelete := keys[idx]
 		keys = append(keys[:idx], keys[idx+1:]...)
 		_ = s.store.SaveAuthKeys(keys)
+
+		// Also delete the bound local user
+		users := s.store.LoadUsers()
+		userIdx := -1
+		for i, u := range users {
+			if u.BoundKeyID == keyToDelete.ID {
+				userIdx = i
+				break
+			}
+		}
+		if userIdx >= 0 {
+			users = append(users[:userIdx], users[userIdx+1:]...)
+			_ = s.store.SaveUsers(users)
+		}
+
 		writeJSON(w, 200, map[string]any{"items": s.publicUserKeys()})
 	case http.MethodPost:
 		var b map[string]any
@@ -377,6 +415,8 @@ func (s *Server) consumeQuota(id string, n int, image bool) bool {
 	if n < 1 {
 		n = 1
 	}
+	s.authMu.Lock()
+	defer s.authMu.Unlock()
 	keys := s.store.LoadAuthKeys()
 	for i, k := range keys {
 		if k.ID != id {
@@ -417,6 +457,8 @@ func (s *Server) refundChat(id *Identity, n int) {
 	s.refundQuota(id.ID, n, false)
 }
 func (s *Server) refundQuota(id string, n int, image bool) {
+	s.authMu.Lock()
+	defer s.authMu.Unlock()
 	keys := s.store.LoadAuthKeys()
 	for i, k := range keys {
 		if k.ID != id {

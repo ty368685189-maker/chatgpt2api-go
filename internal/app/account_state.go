@@ -76,6 +76,8 @@ func (s *Server) markAccountSuccess(token string, image bool) {
 	if token == "" {
 		return
 	}
+	s.accMu.Lock()
+	defer s.accMu.Unlock()
 	accounts := s.store.LoadAccounts()
 	now := nowISO()
 	for i := range accounts {
@@ -102,6 +104,8 @@ func (s *Server) markAccountFailure(token string, err error, image bool) {
 	if token == "" {
 		return
 	}
+	s.accMu.Lock()
+	defer s.accMu.Unlock()
 	accounts := s.store.LoadAccounts()
 	now := nowISO()
 	for i := range accounts {

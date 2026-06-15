@@ -51,6 +51,23 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if v, ok := body["auto_remove_rate_limited_accounts"]; ok {
 			s.cfg.AutoRemoveRateLimitedAccounts = boolAny(v, false)
 		}
+		if v, ok := body["turnstile_site_key"]; ok {
+			s.cfg.TurnstileSiteKey = strAny(v, "")
+		}
+		if v, ok := body["turnstile_secret_key"]; ok {
+			s.cfg.TurnstileSecretKey = strAny(v, "")
+		}
+		if v, ok := body["free_image_concurrency"]; ok {
+			s.cfg.FreeImageConcurrency = intAny(v, 1)
+		}
+		if v, ok := body["premium_image_concurrency"]; ok {
+			s.cfg.PremiumImageConcurrency = intAny(v, 3)
+		}
+		if v, ok := body["announcement"]; ok {
+			if m, ok := v.(map[string]any); ok {
+				s.cfg.Announcement = m
+			}
+		}
 		_ = s.saveConfig()
 		writeJSON(w, 200, map[string]any{"config": s.configMap(false)})
 	default:
@@ -63,6 +80,54 @@ func (s *Server) handleStorageInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]any{"backend": map[string]any{"type": "json", "description": "本地 JSON 文件存储", "file_path": s.store.path("accounts.json"), "auth_keys_file_path": s.store.path("auth_keys.json"), "gallery_file_path": s.store.path("gallery.json")}, "health": map[string]any{"status": "healthy", "backend": "json"}})
 }
+
+func (s *Server) handleSystemAnnouncement(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErr(w, 405, "method not allowed")
+		return
+	}
+	writeJSON(w, 200, s.cfg.Announcement)
+}
+
+func (s *Server) handleSystemPublicConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErr(w, 405, "method not allowed")
+		return
+	}
+	writeJSON(w, 200, map[string]any{
+		"turnstile_site_key": s.cfg.TurnstileSiteKey,
+	})
+}
+
+func (s *Server) handleSystemPoolStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErr(w, 405, "method not allowed")
+		return
+	}
+	
+	tasks := s.store.LoadTasks()
+	now := time.Now()
+	oneHourAgo := now.Add(-1 * time.Hour)
+	
+	total := 0
+	success := 0
+	
+	for _, t := range tasks {
+		tt, err := time.Parse(time.RFC3339, t.CreatedAt)
+		if err == nil && tt.After(oneHourAgo) {
+			total++
+			if t.Status == "success" {
+				success++
+			}
+		}
+	}
+	
+	writeJSON(w, 200, map[string]any{
+		"total_1h":   total,
+		"success_1h": success,
+	})
+}
+
 func (s *Server) handleSystemStatus(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
@@ -111,25 +176,26 @@ func (s *Server) handleProxyTest(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.requireAdmin(w, r); !ok {
 		return
 	}
-	target := "https://chatgpt.com/backend-api/me"
-	client := &http.Client{Timeout: 15 * time.Second}
-	if strings.TrimSpace(s.cfg.Proxy) != "" {
-		proxyURL, err := url.Parse(s.cfg.Proxy)
-		if err != nil {
-			writeJSON(w, 200, map[string]any{"result": map[string]any{"ok": false, "message": err.Error()}})
-			return
-		}
-		client.Transport = &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+
+	var b struct {
+		URL string `json:"url"`
 	}
-	req, _ := http.NewRequestWithContext(r.Context(), http.MethodGet, target, nil)
-	resp, err := client.Do(req)
-	if err != nil {
-		writeJSON(w, 200, map[string]any{"result": map[string]any{"ok": false, "message": err.Error()}})
+	if !readBody(w, r, &b) {
 		return
 	}
-	defer resp.Body.Close()
-	ok := resp.StatusCode > 0 && resp.StatusCode < 500
-	writeJSON(w, 200, map[string]any{"result": map[string]any{"ok": ok, "status": resp.StatusCode, "message": resp.Status}})
+
+	proxyStr := strings.TrimSpace(b.URL)
+	if proxyStr == "" {
+		proxyStr = strings.TrimSpace(s.cfg.Proxy)
+	}
+
+	ok, status, statusText, latency := s.testProxyConnection(r.Context(), proxyStr)
+
+	if !ok && status == 0 {
+		writeJSON(w, 200, map[string]any{"result": map[string]any{"ok": false, "error": statusText, "latency_ms": latency}})
+		return
+	}
+	writeJSON(w, 200, map[string]any{"result": map[string]any{"ok": ok, "status": status, "error": statusText, "latency_ms": latency}})
 }
 
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {

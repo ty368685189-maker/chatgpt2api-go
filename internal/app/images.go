@@ -262,6 +262,8 @@ func (s *Server) handleImageDownloadSingle(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	rel := strings.TrimPrefix(r.URL.Path, "/api/images/download/")
+	rel = filepath.Clean("/" + rel)
+	rel = strings.TrimPrefix(rel, "/")
 	http.ServeFile(w, r, filepath.Join(s.imagesDir, filepath.FromSlash(rel)))
 }
 func (s *Server) handleThumbnail(w http.ResponseWriter, r *http.Request) {

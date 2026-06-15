@@ -30,6 +30,8 @@ type Server struct {
 	taskCancels map[string]context.CancelFunc
 	accountPool *accountPool
 	logSvc      *logService
+	ipRegCounts map[string]int
+	ipRegDates  map[string]string
 }
 
 func NewServer(root string) (*Server, error) {
@@ -56,10 +58,36 @@ func NewServer(root string) (*Server, error) {
 	if cfg.ImageAccountConcurrency <= 0 {
 		cfg.ImageAccountConcurrency = 3
 	}
+	if cfg.FreeImageConcurrency <= 0 {
+		cfg.FreeImageConcurrency = 1
+	}
+	if cfg.PremiumImageConcurrency <= 0 {
+		cfg.PremiumImageConcurrency = 3
+	}
 	if cfg.AIReview == nil {
 		cfg.AIReview = map[string]any{"enabled": false}
 	}
-	s := &Server{root: root, dataDir: filepath.Join(root, "data"), imagesDir: filepath.Join(root, "data", "images"), webDist: filepath.Join(root, "web_dist"), cfg: cfg, callStarts: map[string]time.Time{}, taskCancels: map[string]context.CancelFunc{}, accountPool: newAccountPool(&cfg)}
+	if cfg.Announcement == nil {
+		cfg.Announcement = map[string]any{
+			"version": 1,
+			"title": "📢 Dual 公益站公告",
+			"items": []string{"📌 注册码在小红书「智宇的工作坊」发放，完全免费", "🎁 注册后默认每日 10 张免费画图额度", "💎 加入 QQ 群找管理员，可提升至每日 20 张", "✅ 一切免费，不收取任何费用"},
+			"qq_group": map[string]any{"number": "1102541055", "image": "/qq-group.png"},
+			"github": map[string]any{"url": "https://github.com/RemotePinee/ChatGPT2API", "author": "RemotePinee"},
+		}
+	}
+	s := &Server{
+		root:        root,
+		dataDir:     filepath.Join(root, "data"),
+		imagesDir:   filepath.Join(root, "data", "images"),
+		webDist:     filepath.Join(root, "web_dist"),
+		cfg:         cfg,
+		callStarts:  map[string]time.Time{},
+		taskCancels: map[string]context.CancelFunc{},
+		accountPool: newAccountPool(&cfg),
+		ipRegCounts: map[string]int{},
+		ipRegDates:  map[string]string{},
+	}
 	if err := os.MkdirAll(s.imagesDir, 0755); err != nil {
 		return nil, err
 	}
@@ -121,6 +149,11 @@ func (s *Server) configMap(includeAuth bool) map[string]any {
 	m["image_account_concurrency"] = s.cfg.ImageAccountConcurrency
 	m["cleanup_protect_gallery"] = s.cfg.CleanupProtectGallery
 	m["cleanup_protect_user_images"] = s.cfg.CleanupProtectUserImages
+	m["announcement"] = s.cfg.Announcement
+	m["turnstile_site_key"] = s.cfg.TurnstileSiteKey
+	m["turnstile_secret_key"] = s.cfg.TurnstileSecretKey
+	m["free_image_concurrency"] = s.cfg.FreeImageConcurrency
+	m["premium_image_concurrency"] = s.cfg.PremiumImageConcurrency
 	if _, ok := m["backup"]; !ok {
 		m["backup"] = disabledBackupSettings()
 	}
@@ -164,12 +197,20 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/auth/me", s.handleAuthMe)
 	s.mux.HandleFunc("/api/auth/users", s.handleAuthUsers)
 	s.mux.HandleFunc("/api/auth/users/", s.handleAuthUserID)
+	s.mux.HandleFunc("/api/invite-codes", s.handleInviteCodes)
+	s.mux.HandleFunc("/api/invite-codes/", s.handleInviteCodeID)
+	s.mux.HandleFunc("/api/register", s.handleRegister)
+	s.mux.HandleFunc("/api/auth/login-password", s.handleLoginPassword)
+	s.mux.HandleFunc("/api/local-users", s.handleLocalUsers)
 	s.mux.HandleFunc("/api/accounts", s.handleAccounts)
 	s.mux.HandleFunc("/api/accounts/refresh", s.handleAccountsRefresh)
 	s.mux.HandleFunc("/api/accounts/update", s.handleAccountsUpdate)
 	s.mux.HandleFunc("/api/settings", s.handleSettings)
 	s.mux.HandleFunc("/api/storage/info", s.handleStorageInfo)
 	s.mux.HandleFunc("/api/system/status", s.handleSystemStatus)
+	s.mux.HandleFunc("/api/system/announcement", s.handleSystemAnnouncement)
+	s.mux.HandleFunc("/api/system/public-config", s.handleSystemPublicConfig)
+	s.mux.HandleFunc("/api/system/pool-status", s.handleSystemPoolStatus)
 	s.mux.HandleFunc("/api/transport/status", s.handleSystemStatus)
 	s.mux.HandleFunc("/api/proxy", s.handleProxy)
 	s.mux.HandleFunc("/api/proxy/test", s.handleProxyTest)
@@ -201,8 +242,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/cpa/pools/", s.handleCPAPoolID)
 	s.mux.HandleFunc("/api/sub2api/servers", s.handleSub2APIServers)
 	s.mux.HandleFunc("/api/sub2api/servers/", s.handleSub2APIServerID)
-	s.mux.HandleFunc("/api/register", s.handleRegisterDisabled)
-	s.mux.HandleFunc("/api/register/", s.handleRegisterDisabled)
 	s.mux.HandleFunc("/api/backup/test", s.handleBackupDisabled)
 	s.mux.HandleFunc("/api/backups", s.handleBackupsDisabled)
 	s.mux.HandleFunc("/api/backups/", s.handleBackupDisabled)

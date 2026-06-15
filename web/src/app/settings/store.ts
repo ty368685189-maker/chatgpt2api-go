@@ -71,6 +71,10 @@ function normalizeConfig(config: SettingsConfig): SettingsConfig {
     cleanup_protect_user_images: Boolean(config.cleanup_protect_user_images ?? true),
     image_poll_timeout_secs: Number(config.image_poll_timeout_secs || 120),
     image_account_concurrency: Number(config.image_account_concurrency || 3),
+    free_image_concurrency: Number(config.free_image_concurrency || 1),
+    premium_image_concurrency: Number(config.premium_image_concurrency || 3),
+    turnstile_site_key: String(config.turnstile_site_key || ""),
+    turnstile_secret_key: String(config.turnstile_secret_key || ""),
     auto_remove_invalid_accounts: Boolean(config.auto_remove_invalid_accounts),
     auto_remove_rate_limited_accounts: Boolean(config.auto_remove_rate_limited_accounts),
     log_levels: Array.isArray(config.log_levels) ? config.log_levels : [],
@@ -110,6 +114,7 @@ function normalizeConfig(config: SettingsConfig): SettingsConfig {
         images: Boolean(backup.include?.images ?? false),
       },
     },
+    announcement: config.announcement,
   };
 }
 
@@ -210,6 +215,10 @@ type SettingsStore = {
   setCleanupProtectUserImages: (value: boolean) => void;
   setImagePollTimeoutSecs: (value: string) => void;
   setImageAccountConcurrency: (value: string) => void;
+  setFreeImageConcurrency: (value: string) => void;
+  setPremiumImageConcurrency: (value: string) => void;
+  setTurnstileSiteKey: (value: string) => void;
+  setTurnstileSecretKey: (value: string) => void;
   setAutoRemoveInvalidAccounts: (value: boolean) => void;
   setAutoRemoveRateLimitedAccounts: (value: boolean) => void;
   setLogLevel: (level: string, enabled: boolean) => void;
@@ -220,6 +229,7 @@ type SettingsStore = {
   setAIReviewField: (key: "enabled" | "base_url" | "api_key" | "model" | "prompt", value: string | boolean) => void;
   setBackupField: (key: keyof BackupSettings, value: string | boolean) => void;
   setBackupInclude: (key: keyof BackupSettings["include"], value: boolean) => void;
+  setAnnouncement: (ann: import("@/lib/api").AnnouncementConfig) => void;
 
   loadRegister: (silent?: boolean) => Promise<void>;
   setRegisterConfig: (config: RegisterConfig) => void;
@@ -449,6 +459,22 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     set((state) => state.config ? { config: { ...state.config, image_account_concurrency: value }, isDirty: true } : {});
   },
 
+  setFreeImageConcurrency: (value) => {
+    set((state) => state.config ? { config: { ...state.config, free_image_concurrency: value }, isDirty: true } : {});
+  },
+
+  setPremiumImageConcurrency: (value) => {
+    set((state) => state.config ? { config: { ...state.config, premium_image_concurrency: value }, isDirty: true } : {});
+  },
+
+  setTurnstileSiteKey: (value) => {
+    set((state) => state.config ? { config: { ...state.config, turnstile_site_key: value }, isDirty: true } : {});
+  },
+
+  setTurnstileSecretKey: (value) => {
+    set((state) => state.config ? { config: { ...state.config, turnstile_secret_key: value }, isDirty: true } : {});
+  },
+
   setAutoRemoveInvalidAccounts: (value) => {
     set((state) => state.config ? { config: { ...state.config, auto_remove_invalid_accounts: value }, isDirty: true } : {});
   },
@@ -522,6 +548,16 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             [key]: value,
           },
         },
+        isDirty: true,
+      };
+    });
+  },
+
+  setAnnouncement: (ann) => {
+    set((state) => {
+      if (!state.config) return {};
+      return {
+        config: { ...state.config, announcement: ann },
         isDirty: true,
       };
     });

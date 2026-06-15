@@ -83,12 +83,31 @@ export type SettingsConfig = {
   cleanup_protect_user_images?: boolean;
   image_poll_timeout_secs?: number | string;
   image_account_concurrency?: number | string;
+  free_image_concurrency?: number | string;
+  premium_image_concurrency?: number | string;
+  turnstile_site_key?: string;
+  turnstile_secret_key?: string;
   auto_remove_invalid_accounts?: boolean;
   auto_remove_rate_limited_accounts?: boolean;
   log_levels?: string[];
   backup?: BackupSettings;
   backup_state?: BackupState;
+  announcement?: AnnouncementConfig;
   [key: string]: unknown;
+};
+
+export type AnnouncementConfig = {
+  version: number;
+  title: string;
+  items: string[];
+  qq_group?: {
+    number: string;
+    image: string;
+  };
+  github?: {
+    url: string;
+    author: string;
+  };
 };
 
 export type BackupInclude = {
@@ -516,6 +535,27 @@ export async function cancelImageTasks(ids: string[]) {
 
 export async function fetchSettingsConfig() {
   return httpRequest<{ config: SettingsConfig }>("/api/settings");
+}
+
+export async function fetchSystemAnnouncement() {
+  return httpRequest<AnnouncementConfig>("/api/system/announcement");
+}
+
+export interface SystemPublicConfig {
+  turnstile_site_key?: string;
+}
+
+export async function fetchSystemPublicConfig() {
+  return httpRequest<SystemPublicConfig>("/api/system/public-config");
+}
+
+export type SystemPoolStatus = {
+  total_1h: number;
+  success_1h: number;
+};
+
+export async function fetchSystemPoolStatus() {
+  return httpRequest<SystemPoolStatus>("/api/system/pool-status");
 }
 
 export async function updateSettingsConfig(settings: SettingsConfig) {
@@ -1227,4 +1267,99 @@ export async function* streamChat(
   } finally {
     try { reader.releaseLock(); } catch { /* noop */ }
   }
+}
+
+// ── 邀请码 API ──
+
+export type InviteCode = {
+  id: string;
+  code: string;
+  created_at: string;
+  max_uses: number;
+  used_count: number;
+  account_tier: string;
+  image_daily_quota: number;
+  image_daily_unlimited: boolean;
+  image_monthly_quota: number;
+  image_monthly_unlimited: boolean;
+  image_total_quota: number;
+  image_total_unlimited: boolean;
+  chat_daily_quota: number;
+  chat_daily_unlimited: boolean;
+  chat_monthly_quota: number;
+  chat_monthly_unlimited: boolean;
+  chat_total_quota: number;
+  chat_total_unlimited: boolean;
+};
+
+export async function fetchInviteCodes() {
+  return httpRequest<{ items: InviteCode[] }>("/api/invite-codes");
+}
+
+export async function createInviteCode(body: {
+  code?: string;
+  max_uses?: number;
+  image_daily_quota?: number;
+  image_daily_unlimited?: boolean;
+  image_monthly_quota?: number;
+  image_monthly_unlimited?: boolean;
+  image_total_quota?: number;
+  image_total_unlimited?: boolean;
+  chat_daily_quota?: number;
+  chat_daily_unlimited?: boolean;
+  chat_monthly_quota?: number;
+  chat_monthly_unlimited?: boolean;
+  chat_total_quota?: number;
+  chat_total_unlimited?: boolean;
+}) {
+  return httpRequest<{ item: InviteCode; items: InviteCode[] }>("/api/invite-codes", {
+    method: "POST",
+    body,
+  });
+}
+
+export async function deleteInviteCode(id: string) {
+  return httpRequest<{ items: InviteCode[] }>(`/api/invite-codes/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// ── 用户注册 API ──
+
+export async function registerUser(body: {
+  username: string;
+  password: string;
+  invite_code: string;
+}) {
+  return httpRequest<{ ok: boolean; key: string; name: string; user_id: string }>("/api/register", {
+    method: "POST",
+    body,
+    redirectOnUnauthorized: false,
+  });
+}
+
+// ── 用户密码登录 API ──
+
+export async function loginWithPassword(body: {
+  username: string;
+  password: string;
+}) {
+  return httpRequest<{ ok: boolean; bound_raw_key: string; name: string; user_id: string }>("/api/auth/login-password", {
+    method: "POST",
+    body,
+    redirectOnUnauthorized: false,
+  });
+}
+
+// ── 本地用户列表 API（admin） ──
+
+export type LocalUser = {
+  id: string;
+  username: string;
+  bound_key_id: string;
+  created_at: string;
+};
+
+export async function fetchLocalUsers() {
+  return httpRequest<{ items: LocalUser[] }>("/api/local-users");
 }

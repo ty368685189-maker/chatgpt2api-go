@@ -5,6 +5,7 @@ import "./globals.css";
 import { PageTransition } from "@/components/page-transition";
 import { RouteProgress } from "@/components/route-progress";
 import { TopNav } from "@/components/top-nav";
+import { AnnouncementModal } from "@/components/announcement-modal";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,8 +20,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChatGPT 号池管理",
-  description: "ChatGPT account pool management dashboard",
+  title: "Dual 公益站",
+  description: "Dual 公益站 - 免费 AI 画图 & 对话",
 };
 
 export const viewport: Viewport = {
@@ -48,6 +49,7 @@ export default function RootLayout({
         <Toaster position="top-center" richColors offset={48} />
         <RouteProgress />
         <TopNav />
+        <AnnouncementModal />
         <main className="h-screen overflow-x-hidden overflow-y-auto px-4 pt-12 pb-2 text-foreground [scrollbar-gutter:stable_both-edges] sm:px-6 sm:pt-14 lg:px-8">
           <div className="mx-auto box-border flex max-w-[1440px] flex-col pt-[env(safe-area-inset-top)]">
             <PageTransition>{children}</PageTransition>

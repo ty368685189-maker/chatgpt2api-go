@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -69,6 +70,8 @@ func (s *Server) saveTask(t ImageTask) {
 	s.upsertTask(t)
 }
 func (s *Server) upsertTask(t ImageTask) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	t.UpdatedAt = nowISO()
 	tasks := s.store.LoadTasks()
 	for i := range tasks {
@@ -94,6 +97,8 @@ func (s *Server) popTaskCancel(id string) context.CancelFunc {
 	return cancel
 }
 func (s *Server) recoverUnfinishedTasks() {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	tasks := s.store.LoadTasks()
 	changed := false
 	for i := range tasks {
@@ -117,6 +122,8 @@ func (s *Server) cleanupOldTasks() {
 	if days <= 0 {
 		return
 	}
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	cutoff := time.Now().AddDate(0, 0, -days)
 	tasks := s.store.LoadTasks()
 	out := tasks[:0]
@@ -142,6 +149,8 @@ func (s *Server) cleanupOldTasks() {
 }
 
 func (s *Server) updateTaskStatus(id, status, errText string, data []map[string]any) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	tasks := s.store.LoadTasks()
 	for i := range tasks {
 		if tasks[i].ID == id {
@@ -154,6 +163,33 @@ func (s *Server) updateTaskStatus(id, status, errText string, data []map[string]
 		}
 	}
 }
+
+func (s *Server) checkImageConcurrencyLimit(id *Identity) error {
+	maxConc := s.cfg.FreeImageConcurrency
+	if maxConc <= 0 {
+		maxConc = 1
+	}
+	if id.AccountTier == "premium" || id.Role == "admin" {
+		maxConc = s.cfg.PremiumImageConcurrency
+		if maxConc <= 0 {
+			maxConc = 3
+		}
+	}
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	tasks := s.store.LoadTasks()
+	activeCount := 0
+	for _, t := range tasks {
+		if t.OwnerID == id.ID && (t.Status == "pending" || t.Status == "running") {
+			activeCount++
+		}
+	}
+	if activeCount >= maxConc {
+		return fmt.Errorf("您的并发任务数已达上限(%d)，请等待当前绘画完成", maxConc)
+	}
+	return nil
+}
+
 func (s *Server) handleImageTaskGeneration(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.requireIdentity(w, r)
 	if !ok {
@@ -168,6 +204,10 @@ func (s *Server) handleImageTaskGeneration(w http.ResponseWriter, r *http.Reques
 		Resolution   string `json:"resolution"`
 	}
 	if !readBody(w, r, &b) {
+		return
+	}
+	if err := s.checkImageConcurrencyLimit(id); err != nil {
+		writeErr(w, 429, err.Error())
 		return
 	}
 	if b.N < 1 {
@@ -234,6 +274,10 @@ func (s *Server) handleImageTaskGeneration(w http.ResponseWriter, r *http.Reques
 func (s *Server) handleImageTaskEdit(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.requireIdentity(w, r)
 	if !ok {
+		return
+	}
+	if err := s.checkImageConcurrencyLimit(id); err != nil {
+		writeErr(w, 429, err.Error())
 		return
 	}
 	_ = r.ParseMultipartForm(64 << 20)
@@ -338,6 +382,7 @@ func (s *Server) handleImageTaskCancel(w http.ResponseWriter, r *http.Request) {
 	canceled := []string{}
 	skipped := []string{}
 	missing := []string{}
+	s.taskMu.Lock()
 	tasks := s.store.LoadTasks()
 	byID := map[string]int{}
 	for i, t := range tasks {
@@ -366,6 +411,7 @@ func (s *Server) handleImageTaskCancel(w http.ResponseWriter, r *http.Request) {
 		canceled = append(canceled, id)
 	}
 	_ = s.store.SaveTasks(tasks)
+	s.taskMu.Unlock()
 	writeJSON(w, 200, map[string]any{"canceled": canceled, "skipped": skipped, "missing_ids": missing})
 }
 
@@ -715,6 +761,8 @@ func (s *Server) handleGalleryPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	it := GalleryItem{ID: randID(8), ImageRel: rel, PublisherID: id.ID, PublisherName: id.Name, Prompt: strAny(b["prompt"], ""), Model: strAny(b["model"], "gpt-image-2"), Size: strAny(b["size"], ""), CreatedAt: time.Now().Unix(), Status: "visible"}
+	s.galleryMu.Lock()
+	defer s.galleryMu.Unlock()
 	items := s.store.LoadGallery()
 	items = append([]GalleryItem{it}, items...)
 	_ = s.store.SaveGallery(items)
@@ -754,6 +802,8 @@ func (s *Server) handleGalleryItem(w http.ResponseWriter, r *http.Request) {
 		id = parts[0]
 		action = parts[1]
 	}
+	s.galleryMu.Lock()
+	defer s.galleryMu.Unlock()
 	items := s.store.LoadGallery()
 	idx := -1
 	for i, it := range items {
@@ -796,7 +846,9 @@ func (s *Server) handleGalleryItem(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleWeb(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		path := filepath.Join(s.webDist, filepath.Clean(r.URL.Path))
+		rel := filepath.Clean("/" + r.URL.Path)
+		rel = strings.TrimPrefix(rel, "/")
+		path := filepath.Join(s.webDist, filepath.FromSlash(rel))
 		if st, err := os.Stat(path); err == nil && !st.IsDir() {
 			http.ServeFile(w, r, path)
 			return

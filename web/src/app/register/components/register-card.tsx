@@ -403,6 +403,7 @@ export function RegisterCard() {
             <div className="space-y-1.5">
               <label className="font-data text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">注册代理</label>
               <Input value={config.proxy} onChange={(event) => setProxy(event.target.value)} placeholder="http://127.0.0.1:7890" className="h-10 rounded-lg border-border bg-background font-data text-[13px]" disabled={config.enabled} />
+              <p className="text-[10px] text-amber-600 font-medium">配置会在点击「启动」时一并保存生效</p>
             </div>
             <div className="space-y-1.5">
               <label className="font-data text-[10px] font-semibold tracking-[0.16em] text-muted-foreground uppercase">目标剩余额度</label>

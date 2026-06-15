@@ -37,6 +37,7 @@ func (s *Server) startLimitedAccountWatcher() {
 				if err != nil {
 					continue
 				}
+				s.accMu.Lock()
 				updated := s.store.LoadAccounts()
 				for i := range updated {
 					if updated[i].AccessToken == token {
@@ -52,6 +53,7 @@ func (s *Server) startLimitedAccountWatcher() {
 					}
 				}
 				_ = s.store.SaveAccounts(updated)
+				s.accMu.Unlock()
 			}
 		}
 	}()

@@ -18,6 +18,11 @@ type Config struct {
 	ImageAccountConcurrency       int            `json:"image_account_concurrency"`
 	CleanupProtectGallery         bool           `json:"cleanup_protect_gallery"`
 	CleanupProtectUserImages      bool           `json:"cleanup_protect_user_images"`
+	Announcement                  map[string]any `json:"announcement"`
+	TurnstileSiteKey              string         `json:"turnstile_site_key"`
+	TurnstileSecretKey            string         `json:"turnstile_secret_key"`
+	FreeImageConcurrency          int            `json:"free_image_concurrency"`
+	PremiumImageConcurrency       int            `json:"premium_image_concurrency"`
 	Extra                         map[string]any `json:"-"`
 }
 
@@ -129,6 +134,37 @@ type GalleryItem struct {
 	IsEdit        bool   `json:"is_edit"`
 	CreatedAt     int64  `json:"created_at"`
 	Status        string `json:"status"`
+}
+
+type InviteCode struct {
+	ID                    string `json:"id"`
+	Code                  string `json:"code"`
+	CreatedAt             string `json:"created_at"`
+	MaxUses               int    `json:"max_uses"`
+	UsedCount             int    `json:"used_count"`
+	AccountTier           string `json:"account_tier"`
+	ImageDailyQuota       int    `json:"image_daily_quota"`
+	ImageDailyUnlimited   bool   `json:"image_daily_unlimited"`
+	ImageMonthlyQuota     int    `json:"image_monthly_quota"`
+	ImageMonthlyUnlimited bool   `json:"image_monthly_unlimited"`
+	ImageTotalQuota       int    `json:"image_total_quota"`
+	ImageTotalUnlimited   bool   `json:"image_total_unlimited"`
+	ChatDailyQuota        int    `json:"chat_daily_quota"`
+	ChatDailyUnlimited    bool   `json:"chat_daily_unlimited"`
+	ChatMonthlyQuota      int    `json:"chat_monthly_quota"`
+	ChatMonthlyUnlimited  bool   `json:"chat_monthly_unlimited"`
+	ChatTotalQuota        int    `json:"chat_total_quota"`
+	ChatTotalUnlimited    bool   `json:"chat_total_unlimited"`
+}
+
+type LocalUser struct {
+	ID           string `json:"id"`
+	Username     string `json:"username"`
+	PasswordHash string `json:"password_hash"`
+	PasswordSalt string `json:"password_salt"`
+	BoundKeyID   string `json:"bound_key_id"`
+	BoundRawKey  string `json:"bound_raw_key,omitempty"`
+	CreatedAt    string `json:"created_at"`
 }
 
 func nowISO() string { return time.Now().UTC().Format(time.RFC3339Nano) }

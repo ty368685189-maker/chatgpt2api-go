@@ -33,7 +33,7 @@ func (s *Server) ensureCurlImpersonateBinary() (string, error) {
 		}
 		return "", fmt.Errorf("CHATGPT2API_CURL_IMPERSONATE_BIN not found: %s", bin)
 	}
-	for _, name := range curlImpersonateCandidates() {
+	for _, name := range []string{"curl_edge101", "curl_chrome116", "curl_chrome110", "curl_chrome101", "curl-impersonate-chrome", "curl-impersonate"} {
 		if path, err := exec.LookPath(name); err == nil {
 			return path, nil
 		}
@@ -67,7 +67,7 @@ func (s *Server) ensureCurlImpersonateBinary() (string, error) {
 }
 
 func curlImpersonateCandidates() []string {
-	return []string{"curl_edge101", "curl_chrome116", "curl_chrome110", "curl_chrome101", "curl-impersonate", "curl"}
+	return []string{"curl_edge101", "curl_chrome116", "curl_chrome110", "curl_chrome101", "curl-impersonate-chrome", "curl-impersonate", "curl", "curl.exe"}
 }
 
 func findCurlBinaryInDir(dir string) string {
