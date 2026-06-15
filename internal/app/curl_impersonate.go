@@ -162,6 +162,11 @@ func readCurlResponseHeader(reader *bufio.Reader) (int, string, http.Header, err
 		if code >= 100 && code < 200 && code != 101 {
 			continue
 		}
+		// Skip HTTP CONNECT tunnel response (e.g. "HTTP/1.1 200 Connection established")
+		// when using an HTTP proxy. The real response follows after.
+		if strings.Contains(strings.ToLower(statusText), "connection established") {
+			continue
+		}
 		return code, statusText, header, nil
 	}
 }
