@@ -46,18 +46,13 @@ function PoolStatusWidget() {
 
   if (!status) return null;
 
-  // 优先用今日数据，兼容旧版只有1h数据
-  const total = status.total_today ?? status.total_1h ?? 0;
-  const success = status.success_today ?? status.success_1h ?? 0;
-  const { avg_latency_ms } = status;
-  const successRatio = total > 0 ? success / total : 1;
+  const { total_1h, success_1h, avg_latency_ms } = status;
+  const successRatio = total_1h > 0 ? success_1h / total_1h : 1;
   const percentage = Math.round(successRatio * 100);
   
   let indicatorColor = "bg-green-500";
-  if (total > 0 && successRatio < 0.5) indicatorColor = "bg-red-500";
-  else if (total > 0 && successRatio < 0.8) indicatorColor = "bg-orange-500";
-
-  const hasDaily = status.total_today !== undefined;
+  if (total_1h > 0 && successRatio < 0.5) indicatorColor = "bg-red-500";
+  else if (total_1h > 0 && successRatio < 0.8) indicatorColor = "bg-orange-500";
 
   return (
     <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border group">
@@ -66,13 +61,19 @@ function PoolStatusWidget() {
           <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${indicatorColor}`}></span>
           <span className={`relative inline-flex rounded-full h-3 w-3 ${indicatorColor}`}></span>
         </div>
-        <span className="text-[13px] font-medium text-foreground/90">生图成功率 ({hasDaily ? "今日" : "一小时内"})</span>
+        <span className="text-[13px] font-medium text-foreground/90">生图成功率（近一小时）</span>
       </div>
       <div className="text-[12px] text-muted-foreground flex items-center gap-3">
-        <span>调用: <span className="text-foreground font-semibold">{total}</span></span>
-        <span>成功: <span className="text-foreground font-semibold">{success}</span></span>
-        <span>成功率: <span className="text-foreground font-semibold">{percentage}%</span></span>
-        <span>耗时: <span className="text-foreground font-semibold">{avg_latency_ms >= 1000 ? `${(avg_latency_ms / 1000).toFixed(1)}s` : `${avg_latency_ms}ms`}</span></span>
+        {total_1h > 0 ? (
+          <>
+            <span>调用: <span className="text-foreground font-semibold">{total_1h}</span></span>
+            <span>成功: <span className="text-foreground font-semibold">{success_1h}</span></span>
+            <span>成功率: <span className="text-foreground font-semibold">{percentage}%</span></span>
+            <span>耗时: <span className="text-foreground font-semibold">{avg_latency_ms >= 1000 ? `${(avg_latency_ms / 1000).toFixed(1)}s` : `${avg_latency_ms}ms`}</span></span>
+          </>
+        ) : (
+          <span className="text-muted-foreground/70">近一小时暂无生图记录</span>
+        )}
         <button
           onClick={loadStatus}
           disabled={refreshing}
