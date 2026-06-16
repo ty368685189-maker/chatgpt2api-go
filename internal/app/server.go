@@ -32,6 +32,7 @@ type Server struct {
 	logSvc      *logService
 	ipRegCounts map[string]int
 	ipRegDates  map[string]string
+	bootstrap   *bootstrapCache
 }
 
 func NewServer(root string) (*Server, error) {
@@ -78,6 +79,7 @@ func NewServer(root string) (*Server, error) {
 	}
 	s := &Server{
 		root:        root,
+		bootstrap:   newBootstrapCache(10 * time.Minute),
 		dataDir:     filepath.Join(root, "data"),
 		imagesDir:   filepath.Join(root, "data", "images"),
 		webDist:     filepath.Join(root, "web_dist"),
@@ -98,6 +100,13 @@ func NewServer(root string) (*Server, error) {
 	s.mux = http.NewServeMux()
 	s.routes()
 	s.startLimitedAccountWatcher()
+	// Periodic cleanup of bootstrap cache (every 30 minutes)
+	go func() {
+		for {
+			time.Sleep(30 * time.Minute)
+			s.bootstrap.Cleanup()
+		}
+	}()
 	return s, nil
 }
 

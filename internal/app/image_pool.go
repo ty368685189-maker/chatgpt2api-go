@@ -31,6 +31,11 @@ func (s *Server) generateImageWithPool(ctx context.Context, prompt, model, size,
 			}
 			return nil, err
 		}
+		// Inject server bootstrap cache
+		client.cacheRef = s.bootstrap
+		if ss, db, crt, sot, ok := s.bootstrap.Get(token); ok {
+			client.SetBootstrapCache(ss, db, crt, sot)
+		}
 		traceLogf(ctx, "│  ├─ selected image account %s", accountLabel(account))
 		excluded[token] = true
 		items, err := client.GenerateImage(ctx, prompt, model, size, resolution, refs)

@@ -45,8 +45,36 @@ type UpstreamClient struct {
 	secCHUAPlatform string
 	scriptSources   []string
 	dataBuild       string
+	// Cache support: if set, bootstrap and chatRequirements will skip network calls
+	cachedScriptSources []string
+	cachedDataBuild     string
+	cachedCRToken       string
+	cachedCRSOToken     string
+	cacheValid          bool
+	cacheRef            *bootstrapCache // server-level cache for saving results
 }
 
+
+
+
+
+// saveBootstrapCache stores current bootstrap + requirements data in the server cache.
+func (c *UpstreamClient) saveBootstrapCache(cr chatRequirements) {
+	if c.cacheRef != nil && len(c.scriptSources) > 0 && c.dataBuild != "" {
+		c.cacheRef.Set(c.token, c.scriptSources, c.dataBuild, cr.Token, cr.SOToken)
+	}
+}
+// SetBootstrapCache injects cached bootstrap + requirements data so that
+// subsequent calls to bootstrap() and chatRequirements() can skip network.
+func (c *UpstreamClient) SetBootstrapCache(scriptSources []string, dataBuild, crToken, crSOToken string) {
+	if len(scriptSources) > 0 && dataBuild != "" {
+		c.cachedScriptSources = scriptSources
+		c.cachedDataBuild = dataBuild
+		c.cachedCRToken = crToken
+		c.cachedCRSOToken = crSOToken
+		c.cacheValid = true
+	}
+}
 type chatRequirements struct{ Token, ProofToken, TurnstileToken, SOToken string }
 
 type upstreamImageResult struct {
@@ -228,6 +256,13 @@ func (c *UpstreamClient) bootstrapHeaders() http.Header {
 	return h
 }
 func (c *UpstreamClient) bootstrap(ctx context.Context) error {
+	// Use cached bootstrap data if available
+	if c.cacheValid && len(c.cachedScriptSources) > 0 && c.cachedDataBuild != "" {
+		c.scriptSources = c.cachedScriptSources
+		c.dataBuild = c.cachedDataBuild
+		traceLogf(ctx, "│  ├─ step bootstrap ChatGPT home page [CACHED] pow_scripts=%d data_build=%q", len(c.scriptSources), c.dataBuild)
+		return nil
+	}
 	traceLogf(ctx, "│  ├─ step bootstrap ChatGPT home page")
 	start := time.Now()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, chatGPTBaseURL+"/", nil)
@@ -253,6 +288,11 @@ func (c *UpstreamClient) bootstrap(ctx context.Context) error {
 	return nil
 }
 func (c *UpstreamClient) chatRequirements(ctx context.Context) (chatRequirements, error) {
+	// Use cached requirements if available
+	if c.cacheValid && c.cachedCRToken != "" {
+		traceLogf(ctx, "│  ├─ step build sentinel chat requirements [CACHED] token=%v", c.cachedCRToken != "")
+		return chatRequirements{Token: c.cachedCRToken, SOToken: c.cachedCRSOToken}, nil
+	}
 	traceLogf(ctx, "│  ├─ step build sentinel chat requirements")
 	path := "/backend-api/sentinel/chat-requirements"
 	if c.token == "" {
@@ -441,6 +481,8 @@ func (c *UpstreamClient) GenerateImage(ctx context.Context, prompt, model, size,
 	if err != nil {
 		return nil, err
 	}
+	// Save bootstrap + requirements to server cache for reuse
+	c.saveBootstrapCache(cr)
 	uploads := []map[string]any{}
 	for i, b := range refs {
 		traceLogf(ctx, "│  ├─ step upload reference image %d/%d bytes=%d", i+1, len(refs), len(b))
@@ -636,6 +678,7 @@ func (c *UpstreamClient) uploadImage(ctx context.Context, data []byte, name stri
 }
 func (c *UpstreamClient) pollImageIDs(ctx context.Context, cid string, timeout time.Duration) ([]string, []string) {
 	deadline := time.Now().Add(timeout)
+	pollCount := 0
 	for time.Now().Before(deadline) {
 		conv, err := c.getConversation(ctx, cid)
 		if err == nil {
@@ -644,7 +687,13 @@ func (c *UpstreamClient) pollImageIDs(ctx context.Context, cid string, timeout t
 				return f, s
 			}
 		}
-		time.Sleep(4 * time.Second)
+		pollCount++
+		// Adaptive polling: fast at start (2s), slower after 10 polls (4s)
+		if pollCount <= 5 {
+			time.Sleep(2 * time.Second)
+		} else {
+			time.Sleep(4 * time.Second)
+		}
 	}
 	return nil, nil
 }
