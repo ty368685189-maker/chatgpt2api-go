@@ -41,3 +41,8 @@ go_dist/
 *.bak
 web_dist.bak/
 bin/
+
+# Build artifacts and backups
+chat2api-go
+data.bak.*/
+config.json.bak.*
