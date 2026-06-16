@@ -11,6 +11,8 @@ import {
   Sparkles,
   Trash2,
   Wand2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -121,6 +123,11 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
     return () => window.removeEventListener("resize", update);
   }, []);
 
+  const masonryColumns = useMemo(
+    () => distributeMasonry(items, colCount),
+    [items, colCount]
+  );
+
   const loadFirstPage = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -180,7 +187,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
     return () => observer.disconnect();
   }, [loadMore]);
 
-  const handleCopyPrompt = async (text: string) => {
+  const handleCopyPrompt = useCallback(async (text: string) => {
     if (!text.trim()) return;
     try {
       await navigator.clipboard.writeText(text);
@@ -188,7 +195,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
     } catch {
       toast.error("复制失败");
     }
-  };
+  }, []);
 
   /**
    * 用此图二创：把画廊条目的 rel + url + prompt 写进 sessionStorage，跳到画图页。
@@ -197,7 +204,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
    * - url 兜底：rel 缺失时用绝对地址，<img> 至少能加载（fetch 可能拦）
    * - prompt 可空：画廊本身允许空 prompt 发布，到画图页留空让用户自己写就行
    */
-  const handleRedraw = (item: GalleryItem) => {
+  const handleRedraw = useCallback((item: GalleryItem) => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams();
     if (item.image_rel) params.set("redraw_rel", item.image_rel);
@@ -216,7 +223,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
       // 隐私模式 / 配额满时写不进去也不阻断跳转，画图页自己会兜底
     }
     window.location.assign(`/image/?${params.toString()}`);
-  };
+  }, []);
 
   const handleAdminToggleHide = async (item: GalleryItem) => {
     try {
@@ -284,6 +291,56 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
     [items],
   );
 
+  const goPrev = useCallback(() => {
+    if (!focused) return;
+    const idx = items.findIndex((it) => it.id === focused.id);
+    if (idx > 0) setFocused(items[idx - 1]);
+  }, [focused, items]);
+
+  const goNext = useCallback(() => {
+    if (!focused) return;
+    const idx = items.findIndex((it) => it.id === focused.id);
+    if (idx !== -1 && idx < items.length - 1) setFocused(items[idx + 1]);
+  }, [focused, items]);
+
+  useEffect(() => {
+    if (!focused) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [focused, goPrev, goNext]);
+
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartRef.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
+    const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+    
+    // 阈值设为 80px，且横向移动必须大于纵向移动的 2.5 倍，并且纵向移动不能超过 30px，以防上下滚动误触切图
+    if (Math.abs(deltaX) > 80 && Math.abs(deltaX) > Math.abs(deltaY) * 2.5 && Math.abs(deltaY) < 30) {
+      if (deltaX > 0) {
+        goPrev();
+      } else {
+        goNext();
+      }
+    }
+  };
+
   // 关闭弹窗时，focused 立刻置 null 会让 {focused ? ... : null} 内容瞬间从 DOM 消失，
   // 剩下空的 DialogContent 在 Radix 淡出动画里收缩成"屏幕中间一条白线"。
   // 用 lastFocused 缓存最后一次的内容，关闭过渡跑完前继续渲染同一份图片/按钮，
@@ -293,6 +350,10 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
     if (focused) setLastFocused(focused);
   }, [focused]);
   const focusedView = focused ?? lastFocused;
+
+  const focusedIdx = focusedView ? items.findIndex((it) => it.id === focusedView.id) : -1;
+  const hasPrev = focusedIdx > 0;
+  const hasNext = focusedIdx !== -1 && focusedIdx < items.length - 1;
 
   return (
     <>
@@ -365,7 +426,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
           俩条目时直接塞到第一列，不是 bug 是规范——所以瀑布流必须自己分。
           每列内部用 flex-col 顺序堆，列间 gap-3 在 wrapper 上控。 */}
       <div className="mt-6 flex gap-3">
-        {distributeMasonry(items, colCount).map((bucket, colIdx) => (
+        {masonryColumns.map((bucket, colIdx) => (
           <div key={colIdx} className="flex flex-1 flex-col gap-3">
             {bucket.map((item) => {
               const ratio =
@@ -444,7 +505,9 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                   - 实际图片用 object-contain 居中，max-h 限到 65vh 让弹窗一屏装得下
                   竖图两侧的"留白"变成原图的模糊延伸光，不再是突兀的纯黑/纯灰。 */}
               <div
-                className="relative overflow-hidden bg-secondary"
+                className="relative overflow-hidden bg-secondary select-none"
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
                 style={{
                   backgroundImage: `url(${focusedView.url})`,
                   backgroundSize: "cover",
@@ -456,8 +519,34 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                 <img
                   src={focusedView.url}
                   alt={focusedView.prompt.slice(0, 30) || "作品"}
-                  className="relative mx-auto block h-auto max-h-[65vh] w-full object-contain"
+                  className="relative mx-auto block h-auto max-h-[65vh] w-full object-contain pointer-events-none"
                 />
+                {hasPrev ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goPrev();
+                    }}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex size-9 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65 active:scale-90"
+                    title="上一张 (←)"
+                  >
+                    <ChevronLeft className="size-5" />
+                  </button>
+                ) : null}
+                {hasNext ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      goNext();
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex size-9 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65 active:scale-90"
+                    title="下一张 (→)"
+                  >
+                    <ChevronRight className="size-5" />
+                  </button>
+                ) : null}
               </div>
               <div className="flex flex-col gap-3 p-5">
                 <DialogHeader className="gap-1.5 space-y-0">
@@ -503,7 +592,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                 {/* 主排：所有人都能用的 3 个 CTA，强 grid 等分永远不换行。
                     复制 / 二创 / 查看原图——查看原图作为通用次要 action 留在主排，
                     避免管理排在普通 user 视角下空着一排。 */}
-                <div className="mt-2 grid grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <Button
                     onClick={() => void handleCopyPrompt(focusedView.prompt)}
                     disabled={focusedView.is_edit || !focusedView.prompt?.trim()}
@@ -538,7 +627,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                   const cols = (showSelfUnpublish ? 1 : 0) + (showAdminHide ? 1 : 0) + (showAdminDelete ? 1 : 0);
                   if (cols === 0) return null;
                   const gridClass =
-                    cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-2" : "grid-cols-3";
+                    cols === 1 ? "grid-cols-1" : cols === 2 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-3";
                   return (
                     <div className={`grid ${gridClass} gap-2`}>
                       {showSelfUnpublish ? (

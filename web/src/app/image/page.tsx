@@ -967,6 +967,11 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [canUseHighResolution]);
 
+  // Reset composer state when conversation changes to avoid carrying over drafts/files
+  useEffect(() => {
+    clearComposerInputs();
+  }, [selectedConversationId, clearComposerInputs]);
+
   const resetComposer = useCallback(() => {
     clearComposerInputs();
   }, [clearComposerInputs]);
@@ -1303,7 +1308,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         setReferenceImages((prev) => [...prev, nextReference.referenceImage]);
         setReferenceImageFiles((prev) => [...prev, nextReference.file]);
         setImagePrompt("");
-        textareaRef.current?.focus();
+        requestAnimationFrame(() => {
+          const textarea = textareaRef.current;
+          if (textarea) {
+            textarea.focus();
+            textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        });
         toast.success("已加入当前参考图，继续输入描述即可编辑");
       } catch (error) {
         const message = error instanceof Error ? error.message : "读取结果图失败";
@@ -1436,6 +1447,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       textarea.focus();
       const length = textarea.value.length;
       textarea.setSelectionRange(length, length);
+      textarea.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }, []);
 
@@ -1458,7 +1470,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    textareaRef.current?.focus();
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.focus();
+        textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
     toast.success("已复用该卡片的完整配置（包含提示词）");
   }, [canUseHighResolution]);
 
@@ -1479,7 +1497,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    textareaRef.current?.focus();
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        textarea.focus();
+        textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
     toast.success("已套用该卡片的尺寸和参数配置（保留当前提示词）");
   }, [canUseHighResolution]);
 
