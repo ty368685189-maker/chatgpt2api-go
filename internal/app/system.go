@@ -104,22 +104,32 @@ func (s *Server) handleSystemPoolStatus(w http.ResponseWriter, r *http.Request) 
 		writeErr(w, 405, "method not allowed")
 		return
 	}
-	
+
 	tasks := s.store.LoadTasks()
 	now := time.Now()
-	oneHourAgo := now.Add(-1 * time.Hour)
-	
-	total := 0
-	success := 0
+	oneDayAgo := now.Add(-24 * time.Hour)
+
+	total1h, success1h := 0, 0
+	totalToday, successToday := 0, 0
 	var totalLatency time.Duration
 	latencyCount := 0
-	
+	oneHourAgo := now.Add(-1 * time.Hour)
+
 	for _, t := range tasks {
 		tt, err := time.Parse(time.RFC3339, t.CreatedAt)
-		if err == nil && tt.After(oneHourAgo) {
-			total++
+		if err != nil {
+			continue
+		}
+		if tt.After(oneHourAgo) {
+			total1h++
 			if t.Status == "success" {
-				success++
+				success1h++
+			}
+		}
+		if tt.After(oneDayAgo) {
+			totalToday++
+			if t.Status == "success" {
+				successToday++
 				ut, uerr := time.Parse(time.RFC3339, t.UpdatedAt)
 				if uerr == nil {
 					totalLatency += ut.Sub(tt)
@@ -128,15 +138,17 @@ func (s *Server) handleSystemPoolStatus(w http.ResponseWriter, r *http.Request) 
 			}
 		}
 	}
-	
+
 	avgMs := int64(0)
 	if latencyCount > 0 {
 		avgMs = totalLatency.Milliseconds() / int64(latencyCount)
 	}
-	
+
 	writeJSON(w, 200, map[string]any{
-		"total_1h":     total,
-		"success_1h":   success,
+		"total_1h":       total1h,
+		"success_1h":     success1h,
+		"total_today":    totalToday,
+		"success_today":  successToday,
 		"avg_latency_ms": avgMs,
 	})
 }

@@ -553,6 +553,8 @@ export async function fetchSystemPublicConfig() {
 export type SystemPoolStatus = {
   total_1h: number;
   success_1h: number;
+  total_today?: number;
+  success_today?: number;
   avg_latency_ms: number;
 };
 
