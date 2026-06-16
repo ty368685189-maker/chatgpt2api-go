@@ -3,6 +3,11 @@
 import localforage from "localforage";
 
 import type { ImageModel } from "@/lib/api";
+import {
+  listImageConversationsServer,
+  saveImageConversationServer,
+  deleteImageConversationServer,
+} from "@/lib/api";
 
 export type ImageConversationMode = "generate" | "edit";
 
@@ -243,7 +248,71 @@ async function readStoredImageConversations(): Promise<ImageConversation[]> {
 }
 
 export async function listImageConversations(): Promise<ImageConversation[]> {
-  return sortImageConversations(await readStoredImageConversations());
+  // Load from both local and server, merge
+  const localItems = await readStoredImageConversations();
+  
+  try {
+    const serverData = await listImageConversationsServer();
+    const serverItems = (serverData.items || []).map((item) => normalizeConversation(item as ImageConversation & Record<string, unknown>));
+    
+    if (serverItems.length > 0) {
+      // Merge: server items + local items, deduplicate by id, pick latest
+      const merged = new Map<string, ImageConversation>();
+      for (const item of localItems) {
+        merged.set(item.id, item);
+      }
+      for (const item of serverItems) {
+        const existing = merged.get(item.id);
+        merged.set(item.id, existing ? pickLatestConversation(existing, item) : item);
+      }
+      const result = sortImageConversations([...merged.values()]);
+      
+      // Save merged result back to local (without b64 to save space)
+      const stripped = result.map(stripB64ForStorage);
+      await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, stripped);
+      
+      return result;
+    }
+  } catch {
+    // Server unavailable, fall back to local only
+  }
+  
+  return sortImageConversations(localItems);
+}
+
+/** Strip b64_json from images for server sync (too large) */
+function stripB64ForServer(conversation: ImageConversation): Record<string, unknown> {
+  return {
+    ...conversation,
+    turns: conversation.turns.map((turn) => ({
+      ...turn,
+      referenceImages: [], // Don't sync reference images (large dataUrls)
+      images: turn.images.map((img) => ({
+        id: img.id,
+        taskId: img.taskId,
+        status: img.status,
+        url: img.url,
+        revised_prompt: img.revised_prompt,
+        error: img.error,
+        // Skip b64_json - too large for server sync
+      })),
+    })),
+  };
+}
+
+/** Strip b64_json for local storage to save IndexedDB space */
+function stripB64ForStorage(conversation: ImageConversation): ImageConversation {
+  return {
+    ...conversation,
+    turns: conversation.turns.map((turn) => ({
+      ...turn,
+      images: turn.images.map((img) => {
+        if (img.url || img.status !== "success") return img;
+        // Keep b64 only if no URL available
+        return img;
+      }),
+    })),
+  };
 }
 
 export async function saveImageConversations(conversations: ImageConversation[]): Promise<void> {
@@ -254,10 +323,17 @@ export async function saveImageConversations(conversations: ImageConversation[])
       const current = conversationMap.get(conversation.id);
       conversationMap.set(conversation.id, current ? pickLatestConversation(current, conversation) : conversation);
     }
-    await imageConversationStorage.setItem(
-      IMAGE_CONVERSATIONS_KEY,
-      sortImageConversations([...conversationMap.values()]),
-    );
+    const sorted = sortImageConversations([...conversationMap.values()]);
+    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, stripB64ForStorage(sorted));
+    
+    // Sync to server (fire and forget)
+    for (const conversation of conversations) {
+      try {
+        await saveImageConversationServer(stripB64ForServer(conversation));
+      } catch {
+        // Ignore sync errors
+      }
+    }
   });
 }
 
@@ -271,7 +347,14 @@ export async function saveImageConversation(conversation: ImageConversation): Pr
       persistedConversation,
       ...items.filter((item) => item.id !== persistedConversation.id),
     ]);
-    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, nextItems);
+    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, stripB64ForStorage(nextItems));
+    
+    // Sync to server (fire and forget)
+    try {
+      await saveImageConversationServer(stripB64ForServer(persistedConversation));
+    } catch {
+      // Ignore sync errors
+    }
   });
 }
 
@@ -286,6 +369,13 @@ export async function renameImageConversation(id: string, title: string): Promis
       ...items.filter((item) => item.id !== id),
     ]);
     await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, nextItems);
+    
+    // Sync to server
+    try {
+      await saveImageConversationServer(stripB64ForServer(updated));
+    } catch {
+      // Ignore
+    }
   });
 }
 
@@ -296,6 +386,13 @@ export async function deleteImageConversation(id: string): Promise<void> {
       IMAGE_CONVERSATIONS_KEY,
       items.filter((item) => item.id !== id),
     );
+    
+    // Delete from server too
+    try {
+      await deleteImageConversationServer(id);
+    } catch {
+      // Ignore
+    }
   });
 }
 

@@ -238,6 +238,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/api/chat/account-types", s.handleChatAccountTypes)
 	s.mux.HandleFunc("/api/chat/conversations", s.handleChatConversations)
 	s.mux.HandleFunc("/api/chat/conversations/", s.handleChatConversationID)
+	s.mux.HandleFunc("/api/image/conversations", s.handleImageConversations)
+	s.mux.HandleFunc("/api/image/conversations/", s.handleImageConversationID)
 	s.mux.HandleFunc("/api/cpa/pools", s.handleCPAPools)
 	s.mux.HandleFunc("/api/cpa/pools/", s.handleCPAPoolID)
 	s.mux.HandleFunc("/api/sub2api/servers", s.handleSub2APIServers)

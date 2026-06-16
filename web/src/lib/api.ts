@@ -562,6 +562,25 @@ export async function fetchSystemPoolStatus() {
   return httpRequest<SystemPoolStatus>("/api/system/pool-status");
 }
 
+// ── Image Conversations (server-side sync) ──
+
+export async function listImageConversationsServer() {
+  return httpRequest<{ items: Array<Record<string, unknown>> }>("/api/image/conversations");
+}
+
+export async function saveImageConversationServer(conversation: Record<string, unknown>) {
+  return httpRequest<{ item: Record<string, unknown> }>("/api/image/conversations", {
+    method: "POST",
+    body: conversation,
+  });
+}
+
+export async function deleteImageConversationServer(id: string) {
+  return httpRequest<{ ok: boolean }>(`/api/image/conversations/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function updateSettingsConfig(settings: SettingsConfig) {
   return httpRequest<{ config: SettingsConfig }>("/api/settings", {
     method: "POST",
