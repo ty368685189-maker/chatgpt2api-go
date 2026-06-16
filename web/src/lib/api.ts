@@ -1332,6 +1332,7 @@ export async function registerUser(body: {
   username: string;
   password: string;
   invite_code: string;
+  turnstile_token?: string;
 }) {
   return httpRequest<{ ok: boolean; key: string; name: string; user_id: string }>("/api/register", {
     method: "POST",

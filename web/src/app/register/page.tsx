@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { LoaderCircle, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
+import { Turnstile } from "@marsidev/react-turnstile";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,11 +14,12 @@ import { primeAuthSessionCache } from "@/lib/auth-session";
 import { useRedirectIfAuthenticated } from "@/lib/use-auth-guard";
 import { getDefaultRouteForRole, setStoredAuthSession } from "@/store/auth";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCode, setInviteCode] = useState(searchParams.get("code") || "");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [siteKey, setSiteKey] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -166,5 +167,17 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="grid min-h-[calc(100vh-1rem)] w-full place-items-center px-4 py-6">
+        <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

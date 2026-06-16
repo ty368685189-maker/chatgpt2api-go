@@ -296,6 +296,58 @@ func (s *Server) handleAuthUserID(w http.ResponseWriter, r *http.Request) {
 			_ = s.store.SaveUsers(users)
 		}
 
+		// Clean up all data associated with this user
+		ownerID := keyToDelete.ID
+
+		// 1. Remove image tasks
+		tasks := s.store.LoadTasks()
+		filtered := tasks[:0]
+		for _, t := range tasks {
+			if t.OwnerID != ownerID {
+				filtered = append(filtered, t)
+			}
+		}
+		_ = s.store.SaveTasks(filtered)
+
+		// 2. Remove logs
+		logs := s.store.LoadLogs()
+		filteredLogs := logs[:0]
+		for _, l := range logs {
+			sid, _ := l.Detail["subject_id"].(string)
+			if sid != ownerID {
+				filteredLogs = append(filteredLogs, l)
+			}
+		}
+		_ = s.store.SaveLogs(filteredLogs)
+
+		// 3. Remove gallery entries
+		gallery := s.store.LoadGallery()
+		filteredGallery := gallery[:0]
+		for _, g := range gallery {
+			if g.PublisherID != ownerID {
+				filteredGallery = append(filteredGallery, g)
+			}
+		}
+		_ = s.store.SaveGallery(filteredGallery)
+
+		// 4. Remove image ownership records
+		owners := s.store.LoadOwners()
+		for rel, oid := range owners {
+			if oid == ownerID {
+				delete(owners, rel)
+			}
+		}
+		_ = s.store.SaveOwners(owners)
+
+		// 5. Remove image prompt records for owned images
+		prompts := s.store.LoadPrompts()
+		for rel, pr := range prompts {
+			if strAny(pr["owner_id"], "") == ownerID {
+				delete(prompts, rel)
+			}
+		}
+		_ = s.store.SavePrompts(prompts)
+
 		writeJSON(w, 200, map[string]any{"items": s.publicUserKeys()})
 	case http.MethodPost:
 		var b map[string]any
