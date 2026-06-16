@@ -40,3 +40,4 @@ go.zip
 go_dist/
 *.bak
 web_dist.bak/
+bin/

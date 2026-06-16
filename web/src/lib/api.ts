@@ -100,6 +100,7 @@ export type AnnouncementConfig = {
   version: number;
   title: string;
   items: string[];
+  content?: string;
   qq_group?: {
     number: string;
     image: string;
@@ -552,6 +553,7 @@ export async function fetchSystemPublicConfig() {
 export type SystemPoolStatus = {
   total_1h: number;
   success_1h: number;
+  avg_latency_ms: number;
 };
 
 export async function fetchSystemPoolStatus() {

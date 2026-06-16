@@ -111,6 +111,8 @@ func (s *Server) handleSystemPoolStatus(w http.ResponseWriter, r *http.Request) 
 	
 	total := 0
 	success := 0
+	var totalLatency time.Duration
+	latencyCount := 0
 	
 	for _, t := range tasks {
 		tt, err := time.Parse(time.RFC3339, t.CreatedAt)
@@ -118,13 +120,24 @@ func (s *Server) handleSystemPoolStatus(w http.ResponseWriter, r *http.Request) 
 			total++
 			if t.Status == "success" {
 				success++
+				ut, uerr := time.Parse(time.RFC3339, t.UpdatedAt)
+				if uerr == nil {
+					totalLatency += ut.Sub(tt)
+					latencyCount++
+				}
 			}
 		}
 	}
 	
+	avgMs := int64(0)
+	if latencyCount > 0 {
+		avgMs = totalLatency.Milliseconds() / int64(latencyCount)
+	}
+	
 	writeJSON(w, 200, map[string]any{
-		"total_1h":   total,
-		"success_1h": success,
+		"total_1h":     total,
+		"success_1h":   success,
+		"avg_latency_ms": avgMs,
 	})
 }
 

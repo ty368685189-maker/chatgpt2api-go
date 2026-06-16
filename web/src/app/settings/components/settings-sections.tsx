@@ -438,11 +438,11 @@ export function AnnouncementSection() {
         </div>
       </div>
       <div className="space-y-2">
-        <label className={LABEL_CLASS}>公告内容（每行一条）</label>
+        <label className={LABEL_CLASS}>公告内容（直接输入，回车即可换行）</label>
         <Textarea
           rows={6}
-          value={ann.items.join("\n")}
-          onChange={(e) => updateAnn({ items: e.target.value.split("\n").filter((s) => s.trim()) })}
+          value={ann.content ?? (ann.items || []).join("\n")}
+          onChange={(e) => updateAnn({ content: e.target.value })}
           className="rounded-xl border-stone-200 bg-white"
         />
       </div>

@@ -44,7 +44,7 @@ function PoolStatusWidget() {
 
   if (!status) return null;
 
-  const { total_1h, success_1h } = status;
+  const { total_1h, success_1h, avg_latency_ms } = status;
   const successRatio = total_1h > 0 ? success_1h / total_1h : 1;
   const percentage = Math.round(successRatio * 100);
   
@@ -65,6 +65,7 @@ function PoolStatusWidget() {
         <span>调用: <span className="text-stone-700 font-semibold">{total_1h}</span></span>
         <span>成功: <span className="text-stone-700 font-semibold">{success_1h}</span></span>
         <span>成功率: <span className="text-stone-700 font-semibold">{percentage}%</span></span>
+        <span>耗时: <span className="text-stone-700 font-semibold">{avg_latency_ms >= 1000 ? `${(avg_latency_ms / 1000).toFixed(1)}s` : `${avg_latency_ms}ms`}</span></span>
         <button
           onClick={loadStatus}
           disabled={refreshing}
@@ -87,14 +88,20 @@ export function AnnouncementContent({ ann }: { ann: AnnouncementConfig }) {
       {/* 账号池状态监控 */}
       <PoolStatusWidget />
       
-      {/* 公告列表 */}
-      <div className="space-y-2.5">
-        {ann.items?.map((item, i) => (
-          <p key={i} className="text-[14px] leading-relaxed text-stone-600">
-            {item}
-          </p>
-        ))}
-      </div>
+      {/* 公告内容 */}
+      {ann.content ? (
+        <p className="text-[14px] leading-relaxed text-stone-600 whitespace-pre-line">
+          {ann.content}
+        </p>
+      ) : (
+        <div className="space-y-2.5">
+          {ann.items?.map((item, i) => (
+            <p key={i} className="text-[14px] leading-relaxed text-stone-600 whitespace-pre-line">
+              {item}
+            </p>
+          ))}
+        </div>
+      )}
 
       {/* QQ 群 */}
       {ann.qq_group?.number && (
