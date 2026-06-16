@@ -276,8 +276,14 @@ func (c *UpstreamClient) bootstrap(ctx context.Context) error {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		traceLogf(ctx, "│  └─ bootstrap response status=%d duration=%s body=%s", resp.StatusCode, traceHTTPDuration(start), truncateText(string(b), 800))
-		return fmt.Errorf("bootstrap failed: status=%d body=%s", resp.StatusCode, string(b))
+		traceLogf(ctx, "│  └─ bootstrap response status=%d duration=%s body=%s (falling back to defaults)", resp.StatusCode, traceHTTPDuration(start), truncateText(string(b), 800))
+		// Non-2xx from bootstrap (e.g. Cloudflare challenge) — fall back to defaults
+		// so that subsequent API calls (sentinel/chat-requirements, conversation) still proceed.
+		c.scriptSources = []string{defaultPowScript}
+		if c.dataBuild == "" {
+			c.dataBuild = "c/" + defaultClientVersion + "/_"
+		}
+		return nil
 	}
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	c.scriptSources, c.dataBuild = parsePowResources(string(b))

@@ -41,6 +41,9 @@ func isUpstreamBlockErrorText(err error) bool {
 		return false
 	}
 	text := strings.ToLower(err.Error())
+	if strings.Contains(text, "unusual activity") {
+		return true
+	}
 	return (strings.Contains(text, "status=403") || strings.Contains(text, "http 403")) &&
 		(strings.Contains(text, "<html") || strings.Contains(text, "<body") || strings.Contains(text, "meta http-equiv") || strings.Contains(text, "something seems to have gone wrong"))
 }
