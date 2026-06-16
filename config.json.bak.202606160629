@@ -1,0 +1,72 @@
+{
+  "ai_review": {
+    "api_key": "",
+    "base_url": "",
+    "enabled": false,
+    "model": "",
+    "prompt": ""
+  },
+  "announcement": {
+    "github": {
+      "author": "RemotePinee",
+      "url": "https://github.com/RemotePinee/ChatGPT2API"
+    },
+    "items": [
+      " 注册后默认每日 10 张免费画图额度",
+      "觉得不够的可以加入Q 群，升额度（不收费）"
+    ],
+    "qq_group": {
+      "image": "/qq-group.png",
+      "number": "1102541055"
+    },
+    "title": "📢 Dual 公益站公告",
+    "version": 1
+  },
+  "auth-key": "Ty20070218@",
+  "auto_remove_invalid_accounts": true,
+  "auto_remove_rate_limited_accounts": false,
+  "backup": {
+    "access_key_id": "",
+    "account_id": "",
+    "bucket": "",
+    "enabled": false,
+    "encrypt": false,
+    "include": {
+      "accounts_snapshot": true,
+      "auth_keys_snapshot": true,
+      "chat_conversations_snapshot": true,
+      "config": true,
+      "cpa": true,
+      "image_tasks": true,
+      "images": false,
+      "logs": true,
+      "register": true,
+      "sub2api": true
+    },
+    "interval_minutes": 1440,
+    "passphrase": "",
+    "prefix": "backups",
+    "provider": "cloudflare_r2",
+    "rotation_keep": 10,
+    "secret_access_key": ""
+  },
+  "base_url": "",
+  "cleanup_protect_gallery": false,
+  "cleanup_protect_user_images": false,
+  "free_image_concurrency": 1,
+  "global_system_prompt": "",
+  "image_account_concurrency": 3,
+  "image_poll_timeout_secs": 300,
+  "image_retention_days": 15,
+  "log_levels": [
+    "error",
+    "info",
+    "warning"
+  ],
+  "premium_image_concurrency": 3,
+  "proxy": "http://127.0.0.1:7891",
+  "refresh_account_interval_minute": 5,
+  "sensitive_words": [],
+  "turnstile_secret_key": "",
+  "turnstile_site_key": ""
+}

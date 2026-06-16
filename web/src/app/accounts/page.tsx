@@ -195,7 +195,7 @@ const STATUS_BADGE_CLASS: Record<AccountStatus, string> = {
   正常: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-400",
   限流: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-400",
   异常: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/30 dark:text-rose-400",
-  禁用: "border-stone-200 bg-stone-100 text-stone-600 dark:border-stone-850 dark:bg-stone-900/50 dark:text-stone-400",
+  禁用: "border-stone-200 bg-stone-100 text-stone-600 dark:border-stone-800 dark:bg-stone-900/50 dark:text-stone-400",
 };
 
 function quotaUpperBound(account: Account) {

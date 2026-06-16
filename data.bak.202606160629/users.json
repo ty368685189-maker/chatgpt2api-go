@@ -1,0 +1,20 @@
+[
+  {
+    "id": "5aeaca88d390e843",
+    "username": "test0",
+    "password_hash": "3879e81ea97945ae06d1e7aa4dc666883b521e981d2b1e149f006111912dee6f",
+    "password_salt": "b01a95cab88e98a8fd8942ce144f822e",
+    "bound_key_id": "c4c2ecb2ec32",
+    "bound_raw_key": "sk-7e40b9ee2986a9f2d0f30f3a60432464b074287863da6abc",
+    "created_at": "2026-06-15T15:27:24.267825941Z"
+  },
+  {
+    "id": "3d7d1f4ce624ea1c",
+    "username": "Dual",
+    "password_hash": "b6d8c82c56b6fda8841e51677717c9f81ca34481be41d5c29f15904ea9995269",
+    "password_salt": "f96181b1caef424e6cbd50d636e3836d",
+    "bound_key_id": "4662f694fe42",
+    "bound_raw_key": "sk-c96d483cfcf91eb244786e9b348c42b225851a06c1ec0d9d",
+    "created_at": "2026-06-15T15:51:14.175703161Z"
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "70f54a31ebbdef60",
+    "code": "INV-AIWK8GT2",
+    "created_at": "2026-06-15T04:32:01.995221+00:00",
+    "max_uses": 100,
+    "used_count": 5,
+    "account_tier": "free",
+    "image_daily_quota": 10,
+    "image_daily_unlimited": false,
+    "image_monthly_quota": 310,
+    "image_monthly_unlimited": false,
+    "image_total_quota": 100,
+    "image_total_unlimited": true,
+    "chat_daily_quota": 0,
+    "chat_daily_unlimited": true,
+    "chat_monthly_quota": 0,
+    "chat_monthly_unlimited": true,
+    "chat_total_quota": 0,
+    "chat_total_unlimited": true
+  }
+]

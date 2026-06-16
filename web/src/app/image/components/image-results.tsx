@@ -472,7 +472,7 @@ export const ImageResults = memo(function ImageResults({
                     <button
                       type="button"
                       onClick={() => void onReuseTurnConfig(selectedConversation.id, turn.id)}
-                      className="inline-flex h-7 items-center gap-1 rounded-full bg-white/80 dark:bg-stone-850 px-2.5 text-[11px] font-medium text-stone-600 dark:text-stone-300 ring-1 ring-stone-200/80 dark:ring-stone-700/80 transition hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-white"
+                      className="inline-flex h-7 items-center gap-1 rounded-full bg-white/80 dark:bg-stone-800 px-2.5 text-[11px] font-medium text-stone-600 dark:text-stone-300 ring-1 ring-stone-200/80 dark:ring-stone-700/80 transition hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-white"
                     >
                       复用配置
                     </button>
@@ -480,7 +480,7 @@ export const ImageResults = memo(function ImageResults({
                       <button
                         type="button"
                         onClick={() => void onApplyParamsOnly(selectedConversation.id, turn.id)}
-                        className="inline-flex h-7 items-center gap-1 rounded-full bg-white/80 dark:bg-stone-850 px-2.5 text-[11px] font-medium text-stone-600 dark:text-stone-300 ring-1 ring-stone-200/80 dark:ring-stone-700/80 transition hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-white"
+                        className="inline-flex h-7 items-center gap-1 rounded-full bg-white/80 dark:bg-stone-800 px-2.5 text-[11px] font-medium text-stone-600 dark:text-stone-300 ring-1 ring-stone-200/80 dark:ring-stone-700/80 transition hover:bg-stone-100 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-white"
                         title="仅应用此卡片的尺寸与模型参数，保留当前输入框手写提示词"
                       >
                         仅套用参数
@@ -611,7 +611,7 @@ export const ImageResults = memo(function ImageResults({
                                     <button
                                       type="button"
                                       onClick={() => onContinueEdit(selectedConversation.id, image)}
-                                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-850 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                                       aria-label="加入编辑"
                                       title="加入编辑"
                                     >
@@ -620,7 +620,7 @@ export const ImageResults = memo(function ImageResults({
                                     <button
                                       type="button"
                                       onClick={() => void downloadStoredImage(image, index)}
-                                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-850 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                                      className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                                       aria-label="下载"
                                       title="下载"
                                     >
@@ -634,7 +634,7 @@ export const ImageResults = memo(function ImageResults({
                                           "inline-flex size-7 shrink-0 items-center justify-center rounded-full transition",
                                           isFav
                                             ? "bg-amber-50 text-amber-500 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:hover:bg-amber-900/40"
-                                            : "bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-850 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                                            : "bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                                         )}
                                         title={isFav ? "取消收藏" : "加入收藏"}
                                         aria-label={isFav ? "取消收藏" : "加入收藏"}
@@ -677,7 +677,7 @@ export const ImageResults = memo(function ImageResults({
                                               ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
                                               : state === "unsupported"
                                                 ? "cursor-not-allowed bg-stone-50 text-stone-300 dark:bg-stone-800 dark:text-stone-600"
-                                                : "bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-850 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100",
+                                                : "bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100",
                                             disabled && state !== "published" && "opacity-70",
                                           )}
                                           aria-label={label}
@@ -815,7 +815,7 @@ export const ImageResults = memo(function ImageResults({
                   ) : null}
 
                   {turn.status === "error" && turn.error && !isQuotaError(turn.error) ? (
-                    <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-1 text-[11px] text-stone-500 sm:mt-4 sm:text-xs">
+                    <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-stone-100 dark:bg-stone-800 px-3 py-1 text-[11px] text-stone-500 dark:text-stone-400 sm:mt-4 sm:text-xs">
                       <AlertCircle className="size-3 text-stone-400" />
                       <span>{turn.error}</span>
                     </div>
@@ -826,7 +826,7 @@ export const ImageResults = memo(function ImageResults({
                       <button
                         type="button"
                         onClick={() => void onRegenerateTurn(selectedConversation.id, turn.id)}
-                        className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 font-medium text-stone-500 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-850 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-white"
+                        className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 font-medium text-stone-500 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-white"
                       >
                         <RotateCcw className="size-3" />
                         全部重新生成
@@ -841,7 +841,7 @@ export const ImageResults = memo(function ImageResults({
                             void downloadStoredImage(img, idx);
                           });
                         }}
-                        className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 font-medium text-stone-500 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-850 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-white"
+                        className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 font-medium text-stone-500 transition hover:bg-stone-200 hover:text-stone-900 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-white"
                         title="批量下载这一轮生成的全部成功图片"
                       >
                         <Download className="size-3" />
