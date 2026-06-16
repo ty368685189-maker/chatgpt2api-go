@@ -107,6 +107,14 @@ func (s *Server) handleV1ImagesGenerations(w http.ResponseWriter, r *http.Reques
 	if !readBody(w, r, &b) {
 		return
 	}
+	if b.N > 4 {
+		writeErr(w, 400, "目前每次最多只能生成 4 张图片")
+		return
+	}
+	if b.Resolution != "" && strings.ToLower(b.Resolution) != "1k" {
+		writeErr(w, 400, "目前仅支持 1K 分辨率")
+		return
+	}
 	if strings.TrimSpace(b.Prompt) == "" {
 		writeErr(w, 400, "prompt is required")
 		return
@@ -136,6 +144,15 @@ func (s *Server) handleV1ImagesEdits(w http.ResponseWriter, r *http.Request) {
 	}
 	n := 1
 	fmt.Sscanf(r.FormValue("n"), "%d", &n)
+	if n > 4 {
+		writeErr(w, 400, "目前每次最多只能生成 4 张图片")
+		return
+	}
+	resolution := r.FormValue("resolution")
+	if resolution != "" && strings.ToLower(resolution) != "1k" {
+		writeErr(w, 400, "目前仅支持 1K 分辨率")
+		return
+	}
 	inputs := [][]byte{}
 	for _, key := range []string{"image", "image[]"} {
 		for _, fh := range r.MultipartForm.File[key] {
@@ -154,7 +171,11 @@ func (s *Server) handleV1ImagesEdits(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 400, "image file is required")
 		return
 	}
-	s.imageResult(w, r, id, prompt, model, r.FormValue("size"), r.FormValue("resolution"), r.FormValue("response_format"), n, true, inputs)
+	if len(inputs) > 3 {
+		writeErr(w, 400, "参考图数量超限，最多支持 3 张参考图")
+		return
+	}
+	s.imageResult(w, r, id, prompt, model, r.FormValue("size"), resolution, r.FormValue("response_format"), n, true, inputs)
 }
 func (s *Server) handleV1ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	id, ok := s.requireIdentity(w, r)

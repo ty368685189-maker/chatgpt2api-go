@@ -119,88 +119,88 @@ export default function InvitesPage() {
           <CardContent className="p-5 space-y-4">
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-stone-700 mb-1">最大使用次数</label>
+                <label className="block text-sm font-medium text-foreground mb-1">最大使用次数</label>
                 <Input
                   type="number"
                   value={form.maxUses}
                   onChange={(e) => setForm({ ...form, maxUses: e.target.value })}
-                  className="h-10 rounded-xl max-w-xs"
+                  className="h-10 rounded-xl max-w-xs border-input bg-background text-foreground"
                 />
               </div>
 
               {/* 画图额度 */}
-              <div className="rounded-2xl border border-stone-100 bg-stone-50/50 p-4 space-y-4">
+              <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-white shadow-sm border border-stone-100">
-                    <ImageIcon className="size-4 text-stone-500" />
+                  <div className="flex size-8 items-center justify-center rounded-full bg-card shadow-sm border border-border">
+                    <ImageIcon className="size-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-stone-900">画图额度</h3>
-                    <p className="text-xs text-stone-500">按生成图片张数计数。</p>
+                    <h3 className="text-sm font-semibold text-foreground">画图额度</h3>
+                    <p className="text-xs text-muted-foreground">按生成图片张数计数。</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-stone-700 mb-1">日限额</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">日限额</label>
                     <div className="flex items-center gap-2">
-                      <Input type="number" value={form.imageDaily} onChange={e => setForm({...form, imageDaily: e.target.value})} disabled={form.imageDailyUnl} className="h-9 rounded-lg bg-white" />
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600 shrink-0 cursor-pointer"><Checkbox checked={form.imageDailyUnl} onCheckedChange={c => setForm({...form, imageDailyUnl: !!c})} /> 不限</label>
+                      <Input type="number" value={form.imageDaily} onChange={e => setForm({...form, imageDaily: e.target.value})} disabled={form.imageDailyUnl} className="h-9 rounded-lg border-input bg-background text-foreground" />
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer"><Checkbox checked={form.imageDailyUnl} onCheckedChange={c => setForm({...form, imageDailyUnl: !!c})} /> 不限</label>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-stone-700 mb-1">月限额</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">月限额</label>
                     <div className="flex items-center gap-2">
-                      <Input type="number" value={form.imageMonthly} onChange={e => setForm({...form, imageMonthly: e.target.value})} disabled={form.imageMonthlyUnl} className="h-9 rounded-lg bg-white" />
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600 shrink-0 cursor-pointer"><Checkbox checked={form.imageMonthlyUnl} onCheckedChange={c => setForm({...form, imageMonthlyUnl: !!c})} /> 不限</label>
+                      <Input type="number" value={form.imageMonthly} onChange={e => setForm({...form, imageMonthly: e.target.value})} disabled={form.imageMonthlyUnl} className="h-9 rounded-lg border-input bg-background text-foreground" />
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer"><Checkbox checked={form.imageMonthlyUnl} onCheckedChange={c => setForm({...form, imageMonthlyUnl: !!c})} /> 不限</label>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-stone-700 mb-1">总额度</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">总额度</label>
                     <div className="flex items-center gap-2">
-                      <Input type="number" value={form.imageTotal} onChange={e => setForm({...form, imageTotal: e.target.value})} disabled={form.imageTotalUnl} className="h-9 rounded-lg bg-white" />
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600 shrink-0 cursor-pointer"><Checkbox checked={form.imageTotalUnl} onCheckedChange={c => setForm({...form, imageTotalUnl: !!c})} /> 不限</label>
+                      <Input type="number" value={form.imageTotal} onChange={e => setForm({...form, imageTotal: e.target.value})} disabled={form.imageTotalUnl} className="h-9 rounded-lg border-input bg-background text-foreground" />
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer"><Checkbox checked={form.imageTotalUnl} onCheckedChange={c => setForm({...form, imageTotalUnl: !!c})} /> 不限</label>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 对话额度 */}
-              <div className="rounded-2xl border border-stone-100 bg-stone-50/50 p-4 space-y-4">
+              <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-white shadow-sm border border-stone-100">
-                    <MessageSquare className="size-4 text-stone-500" />
+                  <div className="flex size-8 items-center justify-center rounded-full bg-card shadow-sm border border-border">
+                    <MessageSquare className="size-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-stone-900">对话额度</h3>
-                    <p className="text-xs text-stone-500">POST /api/chat/stream 每次请求扣 1。</p>
+                    <h3 className="text-sm font-semibold text-foreground">对话额度</h3>
+                    <p className="text-xs text-muted-foreground">POST /api/chat/stream 每次请求扣 1。</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-stone-700 mb-1">日限额</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">日限额</label>
                     <div className="flex items-center gap-2">
-                      <Input type="number" value={form.chatDaily} onChange={e => setForm({...form, chatDaily: e.target.value})} disabled={form.chatDailyUnl} className="h-9 rounded-lg bg-white" />
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600 shrink-0 cursor-pointer"><Checkbox checked={form.chatDailyUnl} onCheckedChange={c => setForm({...form, chatDailyUnl: !!c})} /> 不限</label>
+                      <Input type="number" value={form.chatDaily} onChange={e => setForm({...form, chatDaily: e.target.value})} disabled={form.chatDailyUnl} className="h-9 rounded-lg border-input bg-background text-foreground" />
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer"><Checkbox checked={form.chatDailyUnl} onCheckedChange={c => setForm({...form, chatDailyUnl: !!c})} /> 不限</label>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-stone-700 mb-1">月限额</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">月限额</label>
                     <div className="flex items-center gap-2">
-                      <Input type="number" value={form.chatMonthly} onChange={e => setForm({...form, chatMonthly: e.target.value})} disabled={form.chatMonthlyUnl} className="h-9 rounded-lg bg-white" />
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600 shrink-0 cursor-pointer"><Checkbox checked={form.chatMonthlyUnl} onCheckedChange={c => setForm({...form, chatMonthlyUnl: !!c})} /> 不限</label>
+                      <Input type="number" value={form.chatMonthly} onChange={e => setForm({...form, chatMonthly: e.target.value})} disabled={form.chatMonthlyUnl} className="h-9 rounded-lg border-input bg-background text-foreground" />
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer"><Checkbox checked={form.chatMonthlyUnl} onCheckedChange={c => setForm({...form, chatMonthlyUnl: !!c})} /> 不限</label>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-stone-700 mb-1">总额度</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">总额度</label>
                     <div className="flex items-center gap-2">
-                      <Input type="number" value={form.chatTotal} onChange={e => setForm({...form, chatTotal: e.target.value})} disabled={form.chatTotalUnl} className="h-9 rounded-lg bg-white" />
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600 shrink-0 cursor-pointer"><Checkbox checked={form.chatTotalUnl} onCheckedChange={c => setForm({...form, chatTotalUnl: !!c})} /> 不限</label>
+                      <Input type="number" value={form.chatTotal} onChange={e => setForm({...form, chatTotal: e.target.value})} disabled={form.chatTotalUnl} className="h-9 rounded-lg border-input bg-background text-foreground" />
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer"><Checkbox checked={form.chatTotalUnl} onCheckedChange={c => setForm({...form, chatTotalUnl: !!c})} /> 不限</label>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <Button onClick={() => void handleCreate()} disabled={creating} className="rounded-xl">
+            <Button onClick={() => void handleCreate()} disabled={creating} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 mt-4">
               {creating ? <LoaderCircle className="size-4 animate-spin mr-1" /> : null}
               确认创建
             </Button>

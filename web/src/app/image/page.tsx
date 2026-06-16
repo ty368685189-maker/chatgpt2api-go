@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { History, Infinity as InfinityIcon, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { History, Infinity as InfinityIcon, LoaderCircle, Plus, Trash2, CheckSquare, Download, Share2, Star } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { ImageComposer } from "@/app/image/components/image-composer";
 import { ImageResults, type ImageLightboxItem, type ImagePublishState } from "@/app/image/components/image-results";
@@ -21,11 +22,19 @@ import {
   createImageEditTask,
   createImageGenerationTask,
   cancelImageTasks,
+  deleteManagedImages,
   fetchImageTasks,
   fetchMyIdentity,
   publishGalleryItem,
   type ImageTask,
+  type ManagedImage,
 } from "@/lib/api";
+
+function getPathFromUrl(url?: string): string | null {
+  if (!url) return null;
+  const match = url.match(/\/images\/(.+)$/);
+  return match ? match[1] : null;
+}
 import { useAuthGuard } from "@/lib/use-auth-guard";
 import {
   clearImageConversations,
@@ -52,8 +61,10 @@ const HIGH_RESOLUTION_VALUES = new Set(["2k", "4k"]);
 // 关浏览器后从底部重看更自然；要跨浏览器会话保留改成 localStorage 即可。
 const SCROLL_POSITION_STORAGE_KEY = "chatgpt2api:image_scroll_positions";
 
-function clampImageCount(value: string) {
-  return String(Math.min(100, Math.max(1, Math.floor(Number(value) || 1))));
+const MAX_REFERENCE_IMAGES = 5;
+
+function clampImageCount(value: string, maxLimit = 4) {
+  return String(Math.max(1, Math.min(maxLimit, Math.floor(Number(value) || 1))));
 }
 
 function isHighResolution(value: string | null | undefined) {
@@ -148,7 +159,9 @@ async function buildReferenceImageFromStoredImage(image: StoredImage, fileName: 
   if (!image.url) {
     return null;
   }
-  const file = await fetchImageAsFile(image.url, fileName);
+  const rel = getPathFromUrl(image.url);
+  const fetchUrl = rel ? `/images/${rel}` : image.url;
+  const file = await fetchImageAsFile(fetchUrl, fileName);
   return {
     referenceImage: {
       name: file.name,
@@ -160,6 +173,12 @@ async function buildReferenceImageFromStoredImage(image: StoredImage, fileName: 
 }
 
 function taskDataToStoredImage(image: StoredImage, task: ImageTask): StoredImage {
+  if (image.status === "error" && (image.error === "用户已取消该任务" || image.error === "已取消")) {
+    if (task.status === "running" || task.status === "queued" || task.status === "pending") {
+      return image;
+    }
+  }
+
   if (task.status === "success") {
     const first = task.data?.[0];
     if (!first?.b64_json && !first?.url) {
@@ -431,10 +450,46 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     | { type: "prompt"; conversationId: string; turnId: string }
     | { type: "results"; conversationId: string; turnId: string }
     | { type: "all" }
+    | { type: "batch" }
     | null
   >(null);
 
-  const parsedCount = useMemo(() => Number(clampImageCount(imageCount)), [imageCount]);
+  // New batch management states
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [selectedImageIds, setSelectedImageIds] = useState<Set<string>>(new Set());
+  const [isBatchActionLoading, setIsBatchActionLoading] = useState(false);
+
+  // New favorites/starring states
+  const [favorites, setFavorites] = useState<ManagedImage[]>([]);
+
+  // Dynamically compute max images allowed per request based on remaining quota
+  const maxImageCountLimit = useMemo(() => {
+    if (availableQuota === "∞") return 4;
+    if (availableQuota === "加载中..." || availableQuota === "--") return 4;
+    const remaining = Number(availableQuota);
+    return Math.max(1, Math.min(4, remaining));
+  }, [availableQuota]);
+
+  const countOptions = useMemo(() => {
+    const opts = [];
+    for (let i = 1; i <= maxImageCountLimit; i++) {
+      opts.push(i);
+    }
+    return opts;
+  }, [maxImageCountLimit]);
+
+  const parsedCount = useMemo(() => {
+    const num = Number(imageCount) || 1;
+    const clamped = Math.max(1, Math.min(maxImageCountLimit, num));
+    return clamped;
+  }, [imageCount, maxImageCountLimit]);
+
+  useEffect(() => {
+    const num = Number(imageCount) || 1;
+    if (num > maxImageCountLimit) {
+      setImageCount(String(maxImageCountLimit));
+    }
+  }, [maxImageCountLimit, imageCount]);
   // 提交前的乐观额度检查：拦掉那些"已发送对话"成功 toast 后又紧跟着 "额度不足" 错误 toast 的双弹。
   // 管理员/不限额度/没拿到额度数据时一律放行，让后端兜底。
   const ensureQuotaForRequest = useCallback(
@@ -460,6 +515,12 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     () => conversations.find((item) => item.id === selectedConversationId) ?? null,
     [conversations, selectedConversationId],
   );
+  const lastPrompt = useMemo(() => {
+    if (!selectedConversation) return "";
+    const activeTurns = selectedConversation.turns.filter((t) => !t.promptDeleted && t.prompt.trim());
+    if (activeTurns.length === 0) return "";
+    return activeTurns[activeTurns.length - 1].prompt;
+  }, [selectedConversation]);
   const activeTaskCount = useMemo(
     () =>
       conversations.reduce((sum, conversation) => {
@@ -477,7 +538,9 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
           ? "删除生成结果"
           : deleteConfirm?.type === "one"
             ? "删除对话"
-            : "";
+            : deleteConfirm?.type === "batch"
+              ? "批量删除图片"
+              : "";
   const deleteConfirmDescription =
     deleteConfirm?.type === "all"
       ? "确认删除全部图片历史记录吗？删除后无法恢复。"
@@ -487,7 +550,9 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
           ? "确认删除这条生成结果吗？对应提示词记录会保留。"
           : deleteConfirm?.type === "one"
             ? "确认删除这条图片对话吗？删除后无法恢复。"
-            : "";
+            : deleteConfirm?.type === "batch"
+              ? `确认删除选中的 ${selectedImageIds.size} 张图片吗？删除后无法恢复。`
+              : "";
 
   useEffect(() => {
     conversationsRef.current = conversations;
@@ -510,23 +575,40 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     if (typeof window === "undefined") return;
     if (redrawHandoffConsumedRef.current) return;
     redrawHandoffConsumedRef.current = true;
-    let raw: string | null = null;
-    try {
-      raw = window.sessionStorage.getItem("chatgpt2api:redraw_handoff");
-      if (raw) window.sessionStorage.removeItem("chatgpt2api:redraw_handoff");
-    } catch {
-      return;
-    }
-    if (!raw) return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const queryRel = searchParams.get("redraw_rel");
+    const queryUrl = searchParams.get("redraw_url");
+    const queryPrompt = searchParams.get("redraw_prompt");
+
     let payload: { rel?: string; url?: string; prompt?: string } | null = null;
-    try {
-      payload = JSON.parse(raw);
-    } catch {
-      return;
+
+    if (queryRel || queryUrl) {
+      payload = {
+        rel: queryRel || "",
+        url: queryUrl || "",
+        prompt: queryPrompt || "",
+      };
+      try {
+        window.history.replaceState(null, "", window.location.pathname);
+      } catch {}
+    } else {
+      let raw: string | null = null;
+      try {
+        raw = window.sessionStorage.getItem("chatgpt2api:redraw_handoff");
+        if (raw) window.sessionStorage.removeItem("chatgpt2api:redraw_handoff");
+      } catch {}
+      if (raw) {
+        try {
+          payload = JSON.parse(raw);
+        } catch {}
+      }
     }
-    const rel = payload?.rel?.trim().replace(/^\/+/, "");
+
+    if (!payload) return;
+    const rel = payload.rel?.trim().replace(/^\/+/, "");
     // 优先 rel → 同源 /images/<rel>，没有 rel 兜底 url（老 handoff 格式）
-    const sourceUrl = rel ? `/images/${rel}` : payload?.url?.trim();
+    const sourceUrl = rel ? `/images/${rel}` : payload.url?.trim();
     if (!sourceUrl) return;
 
     void (async () => {
@@ -561,7 +643,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         const storedCount = typeof window !== "undefined" ? window.localStorage.getItem(IMAGE_COUNT_STORAGE_KEY) : null;
         setImageSize(storedSize || "");
         setImageResolution(storedResolution || "");
-        setImageCount(storedCount ? clampImageCount(storedCount) : "1");
+        setImageCount(storedCount ? clampImageCount(storedCount, 4) : "1");
 
         // 滚动位置表只在浏览器侧、首次进入时加载一次
         if (typeof window !== "undefined") {
@@ -621,6 +703,8 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       cancelled = true;
     };
   }, []);
+
+
 
   const loadQuota = useCallback(async () => {
     if (isAdmin) {
@@ -789,6 +873,8 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [selectedConversationId]);
 
+
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -894,6 +980,14 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
   const handleDeleteConversation = async (id: string) => {
     const target = conversationsRef.current.find((item) => item.id === id);
     const taskIdsToCancel = target ? collectLoadingTaskIds(target) : [];
+    const pathsToDelete = target
+      ? target.turns.flatMap((turn) =>
+          turn.images.flatMap((img) => {
+            const path = getPathFromUrl(img.url);
+            return path ? [path] : [];
+          })
+        )
+      : [];
 
     const nextConversations = conversations.filter((item) => item.id !== id);
     conversationsRef.current = nextConversations;
@@ -904,6 +998,20 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     }
 
     void cancelTaskIdsSilently(taskIdsToCancel);
+    if (pathsToDelete.length > 0) {
+      void deleteManagedImages({ paths: pathsToDelete }).catch(() => {});
+      setFavorites((prev) => {
+        const next = prev.filter(
+          (fav) =>
+            !pathsToDelete.includes(fav.rel || "") &&
+            !pathsToDelete.includes(fav.url || ""),
+        );
+        try {
+          localStorage.setItem("chatgpt2api:favorites", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    }
 
     try {
       await deleteImageConversation(id);
@@ -922,9 +1030,18 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       return;
     }
 
+    const targetTurn = conversation.turns.find((turn) => turn.id === turnId);
+    const pathsToDelete =
+      part === "results" && targetTurn
+        ? targetTurn.images.flatMap((img) => {
+            const path = getPathFromUrl(img.url);
+            return path ? [path] : [];
+          })
+        : [];
+
     const taskIdsToCancel =
       part === "results"
-        ? collectTurnLoadingTaskIds(conversation.turns.find((turn) => turn.id === turnId) ?? ({ images: [] } as unknown as ImageTurn))
+        ? collectTurnLoadingTaskIds(targetTurn ?? ({ images: [] } as unknown as ImageTurn))
         : [];
 
     const turns = conversation.turns
@@ -948,6 +1065,9 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       .filter((turn): turn is ImageTurn => Boolean(turn));
 
     void cancelTaskIdsSilently(taskIdsToCancel);
+    if (pathsToDelete.length > 0) {
+      void deleteManagedImages({ paths: pathsToDelete }).catch(() => {});
+    }
 
     if (turns.length === 0) {
       await handleDeleteConversation(conversationId);
@@ -964,6 +1084,14 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
 
   const handleClearHistory = async () => {
     const taskIdsToCancel = conversationsRef.current.flatMap(collectLoadingTaskIds);
+    const pathsToDelete = conversationsRef.current.flatMap((conv) =>
+      conv.turns.flatMap((turn) =>
+        turn.images.flatMap((img) => {
+          const path = getPathFromUrl(img.url);
+          return path ? [path] : [];
+        })
+      )
+    );
 
     try {
       await clearImageConversations();
@@ -972,6 +1100,20 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       setSelectedConversationId(null);
       resetComposer();
       void cancelTaskIdsSilently(taskIdsToCancel);
+      if (pathsToDelete.length > 0) {
+        void deleteManagedImages({ paths: pathsToDelete }).catch(() => {});
+        setFavorites((prev) => {
+          const next = prev.filter(
+            (fav) =>
+              !pathsToDelete.includes(fav.rel || "") &&
+              !pathsToDelete.includes(fav.url || ""),
+          );
+          try {
+            localStorage.setItem("chatgpt2api:favorites", JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      }
       toast.success("已清空历史记录");
     } catch (error) {
       const message = error instanceof Error ? error.message : "清空历史记录失败";
@@ -998,13 +1140,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     setDeleteConfirm({ type: "one", id });
   };
 
-  const openDeletePromptConfirm = (conversationId: string, turnId: string) => {
+  const openDeletePromptConfirm = useCallback((conversationId: string, turnId: string) => {
     setDeleteConfirm({ type: "prompt", conversationId, turnId });
-  };
+  }, []);
 
-  const openDeleteResultsConfirm = (conversationId: string, turnId: string) => {
+  const openDeleteResultsConfirm = useCallback((conversationId: string, turnId: string) => {
     setDeleteConfirm({ type: "results", conversationId, turnId });
-  };
+  }, []);
 
   const openClearHistoryConfirm = () => {
     setIsHistoryOpen(false);
@@ -1021,6 +1163,10 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       await handleClearHistory();
       return;
     }
+    if (target.type === "batch") {
+      await handleBatchDelete();
+      return;
+    }
     if (target.type === "prompt" || target.type === "results") {
       await handleDeleteTurnPart(target.conversationId, target.turnId, target.type);
       return;
@@ -1033,16 +1179,31 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       return;
     }
 
+    const currentCount = referenceImages.length;
+    if (currentCount >= MAX_REFERENCE_IMAGES) {
+      toast.error(`最多只允许上传 ${MAX_REFERENCE_IMAGES} 张参考图`);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    let allowedFiles = files;
+    if (currentCount + files.length > MAX_REFERENCE_IMAGES) {
+      toast.warning(`参考图数量超限，仅为您添加了前 ${MAX_REFERENCE_IMAGES - currentCount} 张`);
+      allowedFiles = files.slice(0, MAX_REFERENCE_IMAGES - currentCount);
+    }
+
     try {
       const previews = await Promise.all(
-        files.map(async (file) => ({
+        allowedFiles.map(async (file) => ({
           name: file.name,
           type: file.type || "image/png",
           dataUrl: await readFileAsDataUrl(file),
         })),
       );
 
-      setReferenceImageFiles((prev) => [...prev, ...files]);
+      setReferenceImageFiles((prev) => [...prev, ...allowedFiles]);
       setReferenceImages((prev) => [...prev, ...previews]);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -1051,7 +1212,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       const message = error instanceof Error ? error.message : "读取参考图失败";
       toast.error(message);
     }
-  }, []);
+  }, [referenceImages.length]);
 
   const handleReferenceImageChange = useCallback(
     async (files: File[]) => {
@@ -1064,6 +1225,29 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     [appendReferenceImages],
   );
 
+  useEffect(() => {
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
+        return;
+      }
+      if (!event.clipboardData) return;
+      const files = Array.from(event.clipboardData.files).filter((file) =>
+        file.type.startsWith("image/"),
+      );
+      if (files.length === 0) return;
+
+      event.preventDefault();
+      void appendReferenceImages(files);
+      toast.success("已通过剪贴板载入参考图");
+    };
+
+    window.addEventListener("paste", handleGlobalPaste);
+    return () => {
+      window.removeEventListener("paste", handleGlobalPaste);
+    };
+  }, [appendReferenceImages]);
+
   const handleRemoveReferenceImage = useCallback((index: number) => {
     setReferenceImageFiles((prev) => {
       const next = prev.filter((_, currentIndex) => currentIndex !== index);
@@ -1075,8 +1259,33 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     setReferenceImages((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   }, []);
 
+  const handleReorderReferenceImages = useCallback((dragIndex: number, hoverIndex: number) => {
+    setReferenceImageFiles((prev) => {
+      const next = [...prev];
+      if (dragIndex < 0 || dragIndex >= next.length || hoverIndex < 0 || hoverIndex >= next.length) {
+        return prev;
+      }
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(hoverIndex, 0, moved);
+      return next;
+    });
+    setReferenceImages((prev) => {
+      const next = [...prev];
+      if (dragIndex < 0 || dragIndex >= next.length || hoverIndex < 0 || hoverIndex >= next.length) {
+        return prev;
+      }
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(hoverIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
   const handleContinueEdit = useCallback(
     async (conversationId: string, image: StoredImage | StoredReferenceImage) => {
+      if (referenceImages.length >= MAX_REFERENCE_IMAGES) {
+        toast.error(`最多只允许上传 ${MAX_REFERENCE_IMAGES} 张参考图`);
+        return;
+      }
       try {
         const nextReference =
           "dataUrl" in image
@@ -1101,7 +1310,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         toast.error(message);
       }
     },
-    [],
+    [referenceImages.length],
   );
 
   // 单图发布到画廊的状态机：image.id → state。
@@ -1250,8 +1459,374 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       fileInputRef.current.value = "";
     }
     textareaRef.current?.focus();
-    toast.success("已复用这条提示词配置");
+    toast.success("已复用该卡片的完整配置（包含提示词）");
   }, [canUseHighResolution]);
+
+  const handleApplyParamsOnly = useCallback(async (conversationId: string, turnId: string) => {
+    const conversation = conversationsRef.current.find((item) => item.id === conversationId);
+    const turn = conversation?.turns.find((item) => item.id === turnId);
+    if (!conversation || !turn) {
+      return;
+    }
+
+    setImageCount(String(Math.max(1, turn.count || turn.images.length || 1)));
+    setImageSize(turn.size);
+    setImageResolution(!canUseHighResolution && isHighResolution(turn.resolution) ? "" : turn.resolution || "");
+    setReferenceImages(turn.referenceImages);
+    setReferenceImageFiles(
+      turn.referenceImages.map((image) => dataUrlToFile(image.dataUrl, image.name, image.type)),
+    );
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    textareaRef.current?.focus();
+    toast.success("已套用该卡片的尺寸和参数配置（保留当前提示词）");
+  }, [canUseHighResolution]);
+
+  const handleCancelImage = useCallback(
+    async (conversationId: string, imageId: string, taskId?: string) => {
+      if (taskId) {
+        void cancelTaskIdsSilently([taskId]);
+      }
+      await updateConversation(conversationId, (current) => {
+        if (!current) return current as unknown as ImageConversation;
+        return {
+          ...current,
+          updatedAt: new Date().toISOString(),
+          turns: current.turns.map((turn) => {
+            const hasTargetImage = turn.images.some((img) => img.id === imageId);
+            if (!hasTargetImage) return turn;
+            const images = turn.images.map((img) =>
+              img.id === imageId ? { ...img, status: "error" as const, error: "用户已取消该任务" } : img
+            );
+            const derived = deriveTurnStatus({ ...turn, images });
+            return {
+              ...turn,
+              ...derived,
+              images,
+            };
+          }),
+        };
+      });
+      toast.success("已发送取消请求");
+    },
+    [updateConversation]
+  );
+
+  const handleDeleteSingleImage = useCallback(async (conversationId: string, turnId: string, imageId: string) => {
+    const conversation = conversationsRef.current.find((item) => item.id === conversationId);
+    if (!conversation) return;
+
+    const targetTurn = conversation.turns.find((turn) => turn.id === turnId);
+    const targetImage = targetTurn?.images.find((img) => img.id === imageId);
+    const path = getPathFromUrl(targetImage?.url);
+    if (path) {
+      void deleteManagedImages({ paths: [path] }).catch(() => {});
+      setFavorites((prev) => {
+        const next = prev.filter(
+          (fav) =>
+            (fav.rel || fav.url) !== path &&
+            (fav.rel || fav.url) !== targetImage?.url,
+        );
+        try {
+          localStorage.setItem("chatgpt2api:favorites", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    }
+
+    const turns = conversation.turns.map((turn) => {
+      if (turn.id !== turnId) return turn;
+      
+      const nextImages = turn.images.filter((img) => img.id !== imageId);
+      return {
+        ...turn,
+        images: nextImages,
+        ...deriveTurnStatus({ ...turn, images: nextImages })
+      };
+    }).filter(turn => turn.images.length > 0);
+
+    if (turns.length === 0) {
+      await handleDeleteConversation(conversationId);
+      return;
+    }
+
+    const nextConversation = {
+      ...conversation,
+      updatedAt: new Date().toISOString(),
+      turns,
+    };
+    await persistConversation(nextConversation);
+    toast.success("已移除该图片卡片");
+  }, [handleDeleteConversation, persistConversation]);
+
+  // Load favorites on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("chatgpt2api:favorites");
+      if (raw) {
+        setFavorites(JSON.parse(raw));
+      }
+    } catch (err) {
+      console.error("Failed to load favorites:", err);
+    }
+  }, []);
+
+  const handleToggleFavorite = useCallback((image: StoredImage, turnPrompt: string) => {
+    const rel = getPathFromUrl(image.url) || "";
+    const key = rel || image.url || "";
+    if (!key) return;
+
+    setFavorites((prev) => {
+      const already = prev.some((fav) => (fav.rel || fav.url) === key);
+      let next: ManagedImage[];
+      if (already) {
+        next = prev.filter((fav) => (fav.rel || fav.url) !== key);
+        toast.success("已取消收藏");
+      } else {
+        const managed: ManagedImage = {
+          rel: rel,
+          name: rel ? rel.substring(rel.lastIndexOf('/') + 1) : "image.png",
+          date: new Date().toISOString().split('T')[0],
+          size: 0,
+          url: image.url || "",
+          created_at: new Date().toISOString(),
+          prompt: turnPrompt,
+        };
+        next = [managed, ...prev];
+        toast.success("已加入收藏");
+      }
+      try {
+        localStorage.setItem("chatgpt2api:favorites", JSON.stringify(next));
+      } catch (err) {
+        console.error("Failed to save favorites:", err);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleSelectImage = useCallback((imageId: string) => {
+    setSelectedImageIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(imageId)) {
+        next.delete(imageId);
+      } else {
+        next.add(imageId);
+      }
+      return next;
+    });
+  }, []);
+
+  const findStoredImageById = useCallback((id: string): StoredImage | null => {
+    if (!selectedConversation) return null;
+    for (const turn of selectedConversation.turns) {
+      for (const image of turn.images) {
+        if (image.id === id) return image;
+      }
+    }
+    return null;
+  }, [selectedConversation]);
+
+  const downloadStoredImage = useCallback(async (image: StoredImage, index: number) => {
+    let blob: Blob;
+    if (image.b64_json) {
+      const binary = atob(image.b64_json);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      blob = new Blob([bytes], { type: "image/png" });
+    } else if (image.url) {
+      const res = await fetch(image.url);
+      blob = await res.blob();
+    } else {
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `batch-image-${index + 1}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleBatchDownload = useCallback(async () => {
+    setIsBatchActionLoading(true);
+    let downloadedCount = 0;
+    try {
+      const selectedIdsArray = Array.from(selectedImageIds);
+      for (let i = 0; i < selectedIdsArray.length; i++) {
+        const id = selectedIdsArray[i];
+        const img = findStoredImageById(id);
+        if (img && img.status === "success") {
+          await downloadStoredImage(img, i);
+          downloadedCount++;
+          await new Promise((r) => setTimeout(r, 150));
+        }
+      }
+      toast.success(`成功下载 ${downloadedCount} 张图片`);
+    } catch (err) {
+      console.error("批量下载失败:", err);
+      toast.error("批量下载过程中出错");
+    } finally {
+      setIsBatchActionLoading(false);
+    }
+  }, [selectedImageIds, findStoredImageById, downloadStoredImage]);
+
+  const handleBatchPublish = useCallback(async () => {
+    if (!selectedConversation) return;
+    setIsBatchActionLoading(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    const selectedIdsArray = Array.from(selectedImageIds);
+
+    const imageToTurnMap = new Map<string, { image: StoredImage; turn: ImageTurn }>();
+    for (const turn of selectedConversation.turns) {
+      for (const img of turn.images) {
+        if (selectedImageIds.has(img.id)) {
+          imageToTurnMap.set(img.id, { image: img, turn });
+        }
+      }
+    }
+
+    const toPublish = selectedIdsArray
+      .map(id => imageToTurnMap.get(id))
+      .filter((item): item is { image: StoredImage; turn: ImageTurn } => {
+        if (!item || item.image.status !== "success") return false;
+        const state = publishStates.get(item.image.id) || "idle";
+        return state === "idle";
+      });
+
+    if (toPublish.length === 0) {
+      toast.info("没有需要发布的图片（可能已发布或无图片链接）");
+      setIsBatchActionLoading(false);
+      return;
+    }
+
+    setPublishStates((prev) => {
+      const next = new Map(prev);
+      for (const item of toPublish) {
+        next.set(item.image.id, "publishing");
+      }
+      return next;
+    });
+
+    const publishPromises = toPublish.map(async (item) => {
+      const rel = extractImageRel(item.image.url);
+      if (!rel) {
+        setPublishStates((prev) => {
+          const next = new Map(prev);
+          next.set(item.image.id, "unsupported");
+          return next;
+        });
+        failCount++;
+        return;
+      }
+
+      try {
+        await publishGalleryItem({
+          image_rel: rel,
+          prompt: item.turn.prompt || "",
+          model: item.turn.model || "",
+          size: item.turn.size || "",
+        });
+        setPublishStates((prev) => {
+          const next = new Map(prev);
+          next.set(item.image.id, "published");
+          return next;
+        });
+        successCount++;
+      } catch (err) {
+        setPublishStates((prev) => {
+          const next = new Map(prev);
+          next.set(item.image.id, "idle");
+          return next;
+        });
+        failCount++;
+      }
+    });
+
+    await Promise.allSettled(publishPromises);
+
+    if (successCount > 0) {
+      toast.success(`成功发布 ${successCount} 张图片到画廊`);
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount} 张图片发布失败`);
+    }
+
+    setIsBatchActionLoading(false);
+    setIsBatchMode(false);
+    setSelectedImageIds(new Set());
+  }, [selectedConversation, selectedImageIds, publishStates, extractImageRel]);
+
+  const openBatchDeleteConfirm = useCallback(() => {
+    setDeleteConfirm({ type: "batch" });
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (!selectedConversation) return;
+    setIsBatchActionLoading(true);
+
+    const selectedIdsArray = Array.from(selectedImageIds);
+
+    const pathsToDelete: string[] = [];
+    for (const turn of selectedConversation.turns) {
+      for (const img of turn.images) {
+        if (selectedImageIds.has(img.id)) {
+          const path = getPathFromUrl(img.url);
+          if (path) {
+            pathsToDelete.push(path);
+          }
+        }
+      }
+    }
+
+    if (pathsToDelete.length > 0) {
+      try {
+        await deleteManagedImages({ paths: pathsToDelete });
+        setFavorites((prev) => {
+          const next = prev.filter(
+            (fav) =>
+              !pathsToDelete.includes(fav.rel || "") &&
+              !pathsToDelete.includes(fav.url || ""),
+          );
+          try {
+            localStorage.setItem("chatgpt2api:favorites", JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      } catch (err) {
+        console.error("后端批量删除失败:", err);
+      }
+    }
+
+    const turns = selectedConversation.turns.map((turn) => {
+      const nextImages = turn.images.filter((img) => !selectedImageIds.has(img.id));
+      return {
+        ...turn,
+        images: nextImages,
+        ...deriveTurnStatus({ ...turn, images: nextImages })
+      };
+    }).filter(turn => turn.images.length > 0);
+
+    if (turns.length === 0) {
+      await handleDeleteConversation(selectedConversation.id);
+    } else {
+      const nextConversation = {
+        ...selectedConversation,
+        updatedAt: new Date().toISOString(),
+        turns,
+      };
+      await persistConversation(nextConversation);
+      toast.success(`已删除 ${selectedIdsArray.length} 张图片`);
+    }
+
+    setIsBatchActionLoading(false);
+    setIsBatchMode(false);
+    setSelectedImageIds(new Set());
+  }, [selectedConversation, selectedImageIds, handleDeleteConversation, persistConversation]);
 
   const openLightbox = useCallback((images: ImageLightboxItem[], index: number) => {
     if (images.length === 0) {
@@ -1366,45 +1941,163 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         })();
 
         const pendingImages = activeTurn.images.filter((image) => image.status === "loading");
-        const submitted = await Promise.all(
-          pendingImages.map((image) => {
+        const submissionResults = await Promise.all(
+          pendingImages.map(async (image) => {
             const taskId = image.taskId || image.id;
-            return activeTurn.mode === "edit"
-              ? createImageEditTask(taskId, referenceFiles, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution)
-              : createImageGenerationTask(taskId, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution);
-          }),
+            try {
+              const task = activeTurn.mode === "edit"
+                ? await createImageEditTask(taskId, referenceFiles, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution)
+                : await createImageGenerationTask(taskId, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution);
+              return { taskId, task, error: null };
+            } catch (err) {
+              return { taskId, task: null, error: err };
+            }
+          })
         );
-        await applyTasks(submitted);
+
+        const successfulTasks = submissionResults.flatMap(r => r.task ? [r.task] : []);
+        if (successfulTasks.length > 0) {
+          await applyTasks(successfulTasks);
+        }
+
+        const failedSubmissions = submissionResults.filter(r => r.error);
+        if (failedSubmissions.length > 0) {
+          await updateConversation(conversationId, (current) => {
+            const conversation = current ?? snapshot;
+            return {
+              ...conversation,
+              updatedAt: new Date().toISOString(),
+              turns: conversation.turns.map((turn) => {
+                if (turn.id !== activeTurn.id) return turn;
+                const images = turn.images.map((image) => {
+                  const failed = failedSubmissions.find(r => r.taskId === (image.taskId || image.id));
+                  if (failed) {
+                    const errMsg = failed.error instanceof Error ? failed.error.message : "提交生图任务失败";
+                    return { ...image, status: "error" as const, error: errMsg };
+                  }
+                  return image;
+                });
+                const derived = deriveTurnStatus({ ...turn, images });
+                return { ...turn, ...derived, images };
+              }),
+            };
+          });
+        }
+
+        const resubmitCounts = new Map<string, number>();
 
         while (true) {
           const latestConversation = conversationsRef.current.find((conversation) => conversation.id === conversationId);
           const latestTurn = latestConversation?.turns.find((turn) => turn.id === activeTurn.id);
+          if (!latestConversation || !latestTurn) {
+            break;
+          }
+
           const loadingTaskIds =
-            latestTurn?.images.flatMap((image) =>
+            latestTurn.images.flatMap((image) =>
               image.status === "loading" && image.taskId ? [image.taskId] : [],
-            ) || [];
+            );
           if (loadingTaskIds.length === 0) {
             break;
           }
 
           await sleep(2000);
+
+          const postSleepConversation = conversationsRef.current.find((conversation) => conversation.id === conversationId);
+          const postSleepTurn = postSleepConversation?.turns.find((turn) => turn.id === activeTurn.id);
+          if (!postSleepConversation || !postSleepTurn) {
+            break;
+          }
+
           const taskList = await fetchImageTasks(loadingTaskIds);
           if (taskList.items.length > 0) {
             await applyTasks(taskList.items);
           }
-          if (taskList.missing_ids.length > 0 && latestTurn) {
-            const missingImages = latestTurn.images.filter(
-              (image) => image.status === "loading" && image.taskId && taskList.missing_ids.includes(image.taskId),
+
+          if (taskList.missing_ids.length > 0) {
+            const imagesToResubmit: typeof latestTurn.images = [];
+            const imagesToFail: typeof latestTurn.images = [];
+
+            const missingImages = postSleepTurn.images.filter(
+              (image) => image.status === "loading" && image.taskId && taskList.missing_ids.includes(image.taskId)
             );
-            const resubmitted = await Promise.all(
-              missingImages.map((image) =>
-                activeTurn.mode === "edit"
-                  ? createImageEditTask(image.taskId || image.id, referenceFiles, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution)
-                  : createImageGenerationTask(image.taskId || image.id, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution),
-              ),
-            );
-            if (resubmitted.length > 0) {
-              await applyTasks(resubmitted);
+
+            for (const img of missingImages) {
+              const id = img.taskId || img.id;
+              const count = resubmitCounts.get(id) || 0;
+              if (count >= 3) {
+                imagesToFail.push(img);
+              } else {
+                resubmitCounts.set(id, count + 1);
+                imagesToResubmit.push(img);
+              }
+            }
+
+            if (imagesToFail.length > 0) {
+              await updateConversation(conversationId, (current) => {
+                const conversation = current ?? snapshot;
+                return {
+                  ...conversation,
+                  updatedAt: new Date().toISOString(),
+                  turns: conversation.turns.map((turn) => {
+                    if (turn.id !== activeTurn.id) return turn;
+                    const images = turn.images.map((image) => {
+                      const failed = imagesToFail.find(f => (f.taskId || f.id) === (image.taskId || image.id));
+                      if (failed) {
+                        return { ...image, status: "error" as const, error: "任务在服务器端丢失且重试超限" };
+                      }
+                      return image;
+                    });
+                    const derived = deriveTurnStatus({ ...turn, images });
+                    return { ...turn, ...derived, images };
+                  }),
+                };
+              });
+            }
+
+            if (imagesToResubmit.length > 0) {
+              const resubmissionResults = await Promise.all(
+                imagesToResubmit.map(async (image) => {
+                  const taskId = image.taskId || image.id;
+                  try {
+                    const task = activeTurn.mode === "edit"
+                      ? await createImageEditTask(taskId, referenceFiles, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution)
+                      : await createImageGenerationTask(taskId, apiPrompt, activeTurn.model, activeTurn.size, activeTurn.resolution);
+                    return { taskId, task, error: null };
+                  } catch (err) {
+                    return { taskId, task: null, error: err };
+                  }
+                })
+              );
+
+              const successfulResubmitted = resubmissionResults.flatMap(r => r.task ? [r.task] : []);
+              if (successfulResubmitted.length > 0) {
+                await applyTasks(successfulResubmitted);
+              }
+
+              const failedResubmitted = resubmissionResults.filter(r => r.error);
+              if (failedResubmitted.length > 0) {
+                await updateConversation(conversationId, (current) => {
+                  const conversation = current ?? snapshot;
+                  return {
+                    ...conversation,
+                    updatedAt: new Date().toISOString(),
+                    turns: conversation.turns.map((turn) => {
+                      if (turn.id !== activeTurn.id) return turn;
+                      const images = turn.images.map((image) => {
+                        const failed = failedResubmitted.find(r => r.taskId === (image.taskId || image.id));
+                        if (failed) {
+                          const errMsg = failed.error instanceof Error ? failed.error.message : "重试任务提交失败";
+                          return { ...image, status: "error" as const, error: errMsg };
+                        }
+                        return image;
+                      });
+                      const derived = deriveTurnStatus({ ...turn, images });
+                      return { ...turn, ...derived, images };
+                    }),
+                  };
+                });
+              }
             }
           }
         }
@@ -1451,6 +2144,20 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     [loadQuota, updateConversation],
   );
   /* eslint-enable react-hooks/preserve-manual-memoization */
+
+  useEffect(() => {
+    if (isLoadingHistory) return;
+    for (const conversation of conversations) {
+      const hasLoading = conversation.turns.some(
+        (turn) =>
+          (turn.status === "queued" || turn.status === "generating") &&
+          turn.images.some((image) => image.status === "loading"),
+      );
+      if (hasLoading) {
+        void runConversationQueue(conversation.id);
+      }
+    }
+  }, [isLoadingHistory, conversations, runConversationQueue]);
 
   const handleRegenerateTurn = useCallback(
     async (conversationId: string, turnId: string) => {
@@ -1651,15 +2358,23 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
             <Plus className="size-4" />
             <span className="hidden sm:inline text-[13px]">新建</span>
           </Button>
-          <Button
-            variant="outline"
-            className="h-9 cursor-pointer rounded-lg border-border bg-card/90 px-2 text-muted-foreground shadow-[0_4px_16px_-6px_rgba(15,23,42,0.18)] backdrop-blur hover:text-rose-500"
-            onClick={openClearHistoryConfirm}
-            disabled={conversations.length === 0}
-            title="清空历史"
-          >
-            <Trash2 className="size-4" />
-          </Button>
+          {selectedConversation && selectedConversation.turns.some(t => t.images.some(img => img.status === "success")) && (
+            <Button
+              variant={isBatchMode ? "secondary" : "outline"}
+              className={cn(
+                "h-9 cursor-pointer rounded-lg border border-border bg-card/90 px-3 text-foreground shadow-[0_4px_16px_-6px_rgba(15,23,42,0.18)] backdrop-blur transition-all gap-1",
+                isBatchMode && "bg-secondary border-primary/30 text-primary"
+              )}
+              onClick={() => {
+                setIsBatchMode(!isBatchMode);
+                setSelectedImageIds(new Set());
+              }}
+            >
+              <CheckSquare className="size-4" />
+              <span className="hidden sm:inline text-[13px]">{isBatchMode ? "取消管理" : "批量管理"}</span>
+              <span className="inline sm:hidden text-[13px]">{isBatchMode ? "取消" : "批量"}</span>
+            </Button>
+          )}
           </div>
           <div className="pointer-events-auto ml-auto flex items-center gap-2">
             <span className="hidden items-center gap-1.5 rounded-md border border-border bg-card/90 px-2 py-1 shadow-[0_4px_16px_-6px_rgba(15,23,42,0.18)] backdrop-blur sm:inline-flex">
@@ -1678,7 +2393,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         </div>
 
         <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-          <DialogContent className="flex h-[min(82dvh,720px)] w-[92vw] max-w-[440px] flex-col overflow-hidden rounded-[24px] bg-background p-0">
+          <DialogContent className="flex h-dvh w-[300px] max-w-[85vw] flex-col overflow-hidden rounded-r-2xl rounded-l-none border-r border-border bg-background p-0 fixed top-0 left-0 translate-x-0 translate-y-0 duration-300 ease-out data-[state=open]:animate-drawer-in data-[state=closed]:animate-drawer-out sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:h-[min(82dvh,720px)] sm:w-[92vw] sm:max-w-[440px] sm:rounded-[24px] sm:data-[state=open]:zoom-in-[0.98] sm:data-[state=open]:slide-in-from-top-1">
             <DialogHeader className="shrink-0 border-b border-border/50 px-6 py-4">
               <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold tracking-tight">
                 <History className="size-[17px] text-muted-foreground" strokeWidth={2} />
@@ -1753,12 +2468,20 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
                 onDeletePrompt={openDeletePromptConfirm}
                 onDeleteResults={openDeleteResultsConfirm}
                 onReuseTurnConfig={handleReuseTurnConfig}
+                onApplyParamsOnly={handleApplyParamsOnly}
+                onCancelImage={handleCancelImage}
+                onDeleteSingleImage={handleDeleteSingleImage}
                 onRegenerateTurn={handleRegenerateTurn}
                 onRetryImage={handleRetryImage}
                 onReplyToTurn={handleReplyToTurn}
                 onPublishImage={handlePublishImage}
                 publishStateOf={publishStateOf}
                 formatConversationTime={formatConversationTime}
+                isBatchMode={isBatchMode}
+                selectedImageIds={selectedImageIds}
+                onToggleSelectImage={handleToggleSelectImage}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
               />
             )}
           </div>
@@ -1771,41 +2494,104 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
               />
             ) : null}
             <div className="mx-auto w-full max-w-[820px]">
-            <ImageComposer
-              prompt={imagePrompt}
-              imageCount={imageCount}
-              imageSize={imageSize}
-              imageResolution={imageResolution}
-              canUseHighResolution={canUseHighResolution}
-              availableQuota={availableQuota}
-              activeTaskCount={activeTaskCount}
-              referenceImages={referenceImages}
-              textareaRef={textareaRef}
-              fileInputRef={fileInputRef}
-              replyTarget={
-                replyTarget && replyTarget.conversationId === selectedConversationId
-                  ? { sourcePrompt: replyTarget.sourcePrompt, aiMessage: replyTarget.aiMessage }
-                  : null
-              }
-              onCancelReply={() => {
-                // 回复时的参考图是 handleReplyToTurn 自动塞进来的，
-                // 用户取消回复时一并清掉，避免缩略图又"复活"。
-                setReplyTarget(null);
-                setReferenceImages([]);
-                setReferenceImageFiles([]);
-                if (fileInputRef.current) {
-                  fileInputRef.current.value = "";
-                }
-              }}
-              onPromptChange={setImagePrompt}
-              onImageCountChange={(value) => setImageCount(value ? clampImageCount(value) : "")}
-              onImageSizeChange={setImageSize}
-              onImageResolutionChange={setImageResolution}
-              onSubmit={handleSubmit}
-              onPickReferenceImage={() => fileInputRef.current?.click()}
-              onReferenceImageChange={handleReferenceImageChange}
-              onRemoveReferenceImage={handleRemoveReferenceImage}
-            />
+              {isBatchMode ? (
+                <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/90 px-4 py-3 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.3)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div className="flex items-center justify-between sm:justify-start sm:gap-4">
+                    <span className="text-[13px] text-muted-foreground">
+                      已选择 <span className="font-semibold text-foreground font-data tabular-nums">{selectedImageIds.size}</span> 张图片
+                    </span>
+                    {selectedImageIds.size > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedImageIds(new Set())}
+                        className="text-[12px] text-muted-foreground hover:text-foreground transition underline underline-offset-2"
+                      >
+                        清除选择
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsBatchMode(false);
+                        setSelectedImageIds(new Set());
+                      }}
+                      className="h-8 rounded-lg text-xs"
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={selectedImageIds.size === 0 || isBatchActionLoading}
+                      onClick={handleBatchDownload}
+                      className="h-8 rounded-lg text-xs gap-1"
+                    >
+                      <Download className="size-3.5" />
+                      批量下载
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={selectedImageIds.size === 0 || isBatchActionLoading}
+                      onClick={handleBatchPublish}
+                      className="h-8 rounded-lg text-xs gap-1"
+                    >
+                      <Share2 className="size-3.5" />
+                      批量发布
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={selectedImageIds.size === 0 || isBatchActionLoading}
+                      onClick={openBatchDeleteConfirm}
+                      className="h-8 rounded-lg text-xs gap-1"
+                    >
+                      <Trash2 className="size-3.5" />
+                      批量删除
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <ImageComposer
+                  prompt={imagePrompt}
+                  imageCount={imageCount}
+                  imageSize={imageSize}
+                  imageResolution={imageResolution}
+                  canUseHighResolution={canUseHighResolution}
+                  availableQuota={availableQuota}
+                  activeTaskCount={activeTaskCount}
+                  referenceImages={referenceImages}
+                  textareaRef={textareaRef}
+                  fileInputRef={fileInputRef}
+                  lastPrompt={lastPrompt}
+                  replyTarget={
+                    replyTarget && replyTarget.conversationId === selectedConversationId
+                      ? { sourcePrompt: replyTarget.sourcePrompt, aiMessage: replyTarget.aiMessage }
+                      : null
+                  }
+                  onCancelReply={() => {
+                    setReplyTarget(null);
+                    setReferenceImages([]);
+                    setReferenceImageFiles([]);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = "";
+                    }
+                  }}
+                  onPromptChange={setImagePrompt}
+                  onImageCountChange={(value) => setImageCount(value ? clampImageCount(value, maxImageCountLimit) : "")}
+                  onImageSizeChange={setImageSize}
+                  onImageResolutionChange={setImageResolution}
+                  onSubmit={handleSubmit}
+                  onPickReferenceImage={() => fileInputRef.current?.click()}
+                  onReferenceImageChange={handleReferenceImageChange}
+                  onRemoveReferenceImage={handleRemoveReferenceImage}
+                  onReorderReferenceImages={handleReorderReferenceImages}
+                  countOptions={countOptions}
+                />
+              )}
             </div>
           </div>
         </div>

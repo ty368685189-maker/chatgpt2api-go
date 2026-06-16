@@ -29,15 +29,15 @@ export function FloatingSaveBar() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
-      <div className="pointer-events-auto flex w-full max-w-3xl items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
-        <div className="flex items-center gap-2 text-sm text-stone-700">
+      <div className="pointer-events-auto flex w-full max-w-3xl items-center justify-between gap-3 rounded-2xl border border-border bg-card/95 px-4 py-3 shadow-lg backdrop-blur">
+        <div className="flex items-center gap-2 text-sm text-foreground/90">
           <span className="inline-flex size-2 animate-pulse rounded-full bg-amber-500" />
           有未保存的修改
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            className="h-9 cursor-pointer rounded-xl border-stone-200 bg-white px-3 text-stone-700 hover:bg-stone-50"
+            className="h-9 cursor-pointer rounded-xl border-border bg-background px-3 text-foreground/90 hover:bg-muted"
             onClick={() => void revertConfig()}
             disabled={isSaving}
           >
@@ -45,7 +45,7 @@ export function FloatingSaveBar() {
             取消修改
           </Button>
           <Button
-            className="h-9 cursor-pointer rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800"
+            className="h-9 cursor-pointer rounded-xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
             onClick={() => void saveConfig()}
             disabled={isSaving}
           >

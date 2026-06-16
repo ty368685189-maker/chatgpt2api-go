@@ -17,6 +17,7 @@ func (s *Server) thumbnailPath(rel string) string {
 func (s *Server) serveThumbnail(w http.ResponseWriter, r *http.Request, rel string) {
 	rel = relClean(rel)
 	thumb := s.thumbnailPath(rel)
+	w.Header().Set("Cache-Control", "public, max-age=2592000")
 	if _, err := os.Stat(thumb); err == nil {
 		http.ServeFile(w, r, thumb)
 		return
@@ -48,6 +49,12 @@ func (s *Server) serveThumbnail(w http.ResponseWriter, r *http.Request, rel stri
 		nh = maxSide
 		nw = w0 * maxSide / h0
 	}
+	if nw < 1 {
+		nw = 1
+	}
+	if nh < 1 {
+		nh = 1
+	}
 	dst := image.NewRGBA(image.Rect(0, 0, nw, nh))
 	for y := 0; y < nh; y++ {
 		for x := 0; x < nw; x++ {
@@ -56,15 +63,28 @@ func (s *Server) serveThumbnail(w http.ResponseWriter, r *http.Request, rel stri
 			dst.Set(x, y, img.At(sx, sy))
 		}
 	}
-	_ = os.MkdirAll(filepath.Dir(thumb), 0755)
-	out, err := os.Create(thumb)
+	dir := filepath.Dir(thumb)
+	_ = os.MkdirAll(dir, 0755)
+	tmpFile, err := os.CreateTemp(dir, filepath.Base(thumb)+".tmp-*")
 	if err != nil {
 		http.ServeFile(w, r, src)
 		return
 	}
-	defer out.Close()
-	_ = jpeg.Encode(out, dst, &jpeg.Options{Quality: 82})
-	http.ServeFile(w, r, thumb)
+	tmpPath := tmpFile.Name()
+	defer func() {
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
+	}()
+	err = jpeg.Encode(tmpFile, dst, &jpeg.Options{Quality: 82})
+	_ = tmpFile.Sync()
+	_ = tmpFile.Close()
+	if err == nil {
+		if os.Rename(tmpPath, thumb) == nil {
+			http.ServeFile(w, r, thumb)
+			return
+		}
+	}
+	http.ServeFile(w, r, src)
 }
 
 func isImagePath(path string) bool {

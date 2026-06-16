@@ -32,25 +32,25 @@ export function CPAPoolDialog() {
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-      <DialogContent showCloseButton={false} className="rounded-2xl p-6">
+      <DialogContent showCloseButton={false} className="rounded-2xl p-6 border-border bg-background">
         <DialogHeader className="gap-2">
-          <DialogTitle>{editingPool ? "编辑连接" : "添加连接"}</DialogTitle>
-          <DialogDescription className="text-sm leading-6">
+          <DialogTitle className="text-foreground">{editingPool ? "编辑连接" : "添加连接"}</DialogTitle>
+          <DialogDescription className="text-sm leading-6 text-muted-foreground">
             {editingPool ? "修改 CPA 连接信息" : "添加一个新的 CLIProxyAPI 连接"}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-stone-700">名称（可选）</label>
+            <label className="text-sm font-medium text-foreground/90">名称（可选）</label>
             <Input
               value={formName}
               onChange={(event) => setFormName(event.target.value)}
               placeholder="例如：主号池、备用池"
-              className="h-11 rounded-xl border-stone-200 bg-white"
+              className="h-11 rounded-xl border-border bg-background text-foreground"
             />
           </div>
           <div className="space-y-2">
-            <label className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-foreground/90">
               <Link2 className="size-3.5" />
               CPA 地址
             </label>
@@ -58,11 +58,11 @@ export function CPAPoolDialog() {
               value={formBaseUrl}
               onChange={(event) => setFormBaseUrl(event.target.value)}
               placeholder="http://your-cpa-host:8317"
-              className="h-11 rounded-xl border-stone-200 bg-white"
+              className="h-11 rounded-xl border-border bg-background text-foreground"
             />
           </div>
           <div className="space-y-2">
-            <label className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+            <label className="flex items-center gap-1.5 text-sm font-medium text-foreground/90">
               <Unplug className="size-3.5" />
               Management Secret Key
             </label>
@@ -72,11 +72,11 @@ export function CPAPoolDialog() {
                 value={formSecretKey}
                 onChange={(event) => setFormSecretKey(event.target.value)}
                 placeholder={editingPool ? "留空则不修改密钥" : "CPA 管理密钥"}
-                className="h-11 rounded-xl border-stone-200 bg-white pr-10"
+                className="h-11 rounded-xl border-border bg-background text-foreground pr-10"
               />
               <button
                 type="button"
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-stone-400 transition hover:text-stone-600"
+                className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground/80 transition hover:text-foreground"
                 onClick={() => setShowSecret(!showSecret)}
               >
                 {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -87,14 +87,14 @@ export function CPAPoolDialog() {
         <DialogFooter className="pt-2">
           <Button
             variant="secondary"
-            className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+            className="h-10 rounded-xl bg-secondary px-5 text-secondary-foreground hover:bg-secondary/80"
             onClick={() => setDialogOpen(false)}
             disabled={isSavingPool}
           >
             取消
           </Button>
           <Button
-            className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+            className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             onClick={() => void savePool()}
             disabled={isSavingPool}
           >

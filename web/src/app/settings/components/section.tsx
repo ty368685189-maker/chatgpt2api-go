@@ -25,12 +25,12 @@ export function Section({
     <section
       id={id}
       data-settings-section={id}
-      className="scroll-mt-24 space-y-6 border-t border-stone-200/80 pt-10 first:border-t-0 first:pt-0"
+      className="scroll-mt-24 space-y-6 border-t border-border/80 pt-10 first:border-t-0 first:pt-0"
     >
       <header className="space-y-1">
-        <h2 className="text-xl font-semibold tracking-tight text-stone-900">{title}</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-foreground">{title}</h2>
         {description ? (
-          <p className="text-sm leading-6 text-stone-500">{description}</p>
+          <p className="text-sm leading-6 text-muted-foreground">{description}</p>
         ) : null}
       </header>
       <div>{children}</div>

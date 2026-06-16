@@ -594,23 +594,23 @@ export function UserKeysCard() {
 
   return (
     <>
-      <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+      <Card className="rounded-2xl border-border bg-card shadow-sm">
         <CardContent className="space-y-5 p-6">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-stone-100">
-                <KeyRound className="size-5 text-stone-600" />
+              <div className="flex size-10 items-center justify-center rounded-xl bg-secondary">
+                <KeyRound className="size-5 text-muted-foreground" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold tracking-tight">用户密钥管理</h2>
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-muted-foreground">
                   画图与对话各自支持日限额、月限额、总额度三档；任一档可独立勾选「不限额」。
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative min-w-[200px]">
-                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" />
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={query}
                   onChange={(event) => {
@@ -619,11 +619,11 @@ export function UserKeysCard() {
                     setPage(1);
                   }}
                   placeholder="按名称搜索"
-                  className="h-9 w-full rounded-xl border-stone-200 bg-white/85 pl-10"
+                  className="h-9 w-full rounded-xl border-border bg-background pl-10 text-foreground"
                 />
               </div>
               <Button
-                className="h-9 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800"
+                className="h-9 rounded-xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
                 onClick={() => setIsDialogOpen(true)}
               >
                 <Plus className="size-4" />
@@ -633,14 +633,14 @@ export function UserKeysCard() {
           </div>
 
           {revealedKey ? (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-600 dark:text-emerald-400">
               <div className="font-medium">新密钥仅展示一次，请立即保存：</div>
-              <div className="mt-3 flex flex-col gap-3 rounded-lg border border-emerald-200 bg-white/80 p-3 md:flex-row md:items-center md:justify-between">
+              <div className="mt-3 flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-background/80 p-3 md:flex-row md:items-center md:justify-between">
                 <code className="break-all font-mono text-[13px]">{revealedKey}</code>
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 rounded-xl border-emerald-200 bg-white px-4 text-emerald-700"
+                  className="h-9 rounded-xl border-emerald-500/20 bg-card px-4 text-emerald-600 dark:text-emerald-400 hover:bg-secondary"
                   onClick={() => void handleCopy(revealedKey)}
                 >
                   <Copy className="size-4" />
@@ -650,16 +650,16 @@ export function UserKeysCard() {
             </div>
           ) : null}
 
-          <div className="overflow-hidden rounded-xl border border-stone-200">
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
             {isLoading ? (
               <div className="flex items-center justify-center py-10">
-                <LoaderCircle className="size-5 animate-spin text-stone-400" />
+                <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
               </div>
             ) : (
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1040px] text-left">
-                    <thead className="border-b border-stone-200 bg-stone-50 text-[12px] font-medium text-stone-500">
+                    <thead className="border-b border-border bg-secondary/30 text-[12px] font-medium text-muted-foreground">
                       <tr>
                         <th className="w-56 px-4 py-2.5 font-medium">名称</th>
                         <th className="w-24 px-4 py-2.5 font-medium">状态</th>
@@ -691,14 +691,14 @@ export function UserKeysCard() {
 
                 {currentRows.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-                    <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
+                    <div className="rounded-xl bg-secondary p-3 text-muted-foreground">
                       <Search className="size-5" />
                     </div>
                     <div className="space-y-1">
-                      <p className="text-sm font-medium text-stone-700">
+                      <p className="text-sm font-medium text-foreground">
                         {debouncedQuery ? "没有匹配的密钥" : "暂无普通用户密钥"}
                       </p>
-                      <p className="text-sm text-stone-500">
+                      <p className="text-sm text-muted-foreground">
                         {debouncedQuery
                           ? "调整搜索关键字后重试。"
                           : "点击右上角按钮即可创建并分发给其他人。"}
@@ -707,8 +707,8 @@ export function UserKeysCard() {
                   </div>
                 ) : null}
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 px-4 py-3">
-                  <div className="text-sm text-stone-500">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+                  <div className="text-sm text-muted-foreground">
                     显示第 {filteredItems.length === 0 ? 0 : startIndex + 1} -{" "}
                     {Math.min(startIndex + Number(pageSize), filteredItems.length)} 条，共{" "}
                     {filteredItems.length} 条
@@ -722,7 +722,7 @@ export function UserKeysCard() {
                         setPage(1);
                       }}
                     >
-                      <SelectTrigger className="h-9 w-[108px] rounded-lg border-stone-200 bg-white text-sm leading-none">
+                      <SelectTrigger className="h-9 w-[108px] rounded-lg border-border bg-background text-sm leading-none text-foreground">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -736,7 +736,7 @@ export function UserKeysCard() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="size-9 rounded-lg border-stone-200 bg-white"
+                      className="size-9 rounded-lg border-border bg-background text-foreground hover:bg-secondary"
                       disabled={safePage <= 1}
                       onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                     >
@@ -744,7 +744,7 @@ export function UserKeysCard() {
                     </Button>
                     {paginationItems.map((entry, index) =>
                       entry === "..." ? (
-                        <span key={`ellipsis-${index}`} className="px-1 text-sm text-stone-400">
+                        <span key={`ellipsis-${index}`} className="px-1 text-sm text-muted-foreground">
                           ...
                         </span>
                       ) : (
@@ -754,8 +754,8 @@ export function UserKeysCard() {
                           className={cn(
                             "h-9 min-w-9 rounded-lg px-3",
                             entry === safePage
-                              ? "bg-stone-950 text-white hover:bg-stone-800"
-                              : "border-stone-200 bg-white text-stone-700",
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                              : "border-border bg-background text-foreground hover:bg-secondary",
                           )}
                           onClick={() => setPage(entry)}
                         >
@@ -766,7 +766,7 @@ export function UserKeysCard() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="size-9 rounded-lg border-stone-200 bg-white"
+                      className="size-9 rounded-lg border-border bg-background text-foreground hover:bg-secondary"
                       disabled={safePage >= pageCount}
                       onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
                     >
@@ -792,15 +792,15 @@ export function UserKeysCard() {
           }
         }}
       >
-        <DialogContent className="w-[min(94vw,980px)] max-h-[90vh] gap-0 overflow-hidden rounded-[24px] bg-white p-0 sm:max-w-none">
-          <DialogHeader className="border-b border-stone-200/80 bg-stone-50/70 px-6 py-5 pr-14 sm:px-7">
+        <DialogContent className="w-[min(94vw,980px)] max-h-[90vh] gap-0 overflow-hidden rounded-[24px] bg-card p-0 sm:max-w-none">
+          <DialogHeader className="border-b border-border bg-secondary/30 px-6 py-5 pr-14 sm:px-7">
             <div className="flex items-start gap-4">
-              <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-stone-200 bg-white text-stone-800 shadow-sm">
+              <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-border bg-background text-foreground shadow-sm">
                 <KeyRound className="size-5" />
               </div>
               <div className="min-w-0">
                 <DialogTitle className="text-[22px] leading-7">创建用户密钥</DialogTitle>
-                <DialogDescription className="mt-1 max-w-2xl text-sm leading-6 text-stone-500">
+                <DialogDescription className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                   配置用户身份、账号权限与独立额度。创建后会生成一条只能查看一次的原始密钥。
                 </DialogDescription>
               </div>
@@ -812,25 +812,25 @@ export function UserKeysCard() {
                 <SectionHeading title="密钥档案" hint="名称用于后台识别；自定义密钥留空时自动生成。" />
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold tracking-wide text-stone-500 uppercase">名称</label>
+                    <label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">名称</label>
                     <Input
                       value={name}
                       onChange={(event) => setName(event.target.value)}
                       placeholder="例如：设计同学 A、运营临时账号"
-                      className="h-12 rounded-2xl border-stone-200 bg-white shadow-none"
+                      className="h-12 rounded-2xl border-border bg-background shadow-none text-foreground"
                     />
                   </div>
                   <AccountTierSelect value={accountTier} onChange={setAccountTier} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold tracking-wide text-stone-500 uppercase">自定义密钥</label>
+                  <label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">自定义密钥</label>
                   <Input
                     value={customKey}
                     onChange={(event) => setCustomKey(event.target.value)}
                     placeholder="留空则自动生成，例如：sk-your-custom-user-key"
-                    className="h-12 rounded-2xl border-stone-200 bg-white font-mono text-[13px] shadow-none"
+                    className="h-12 rounded-2xl border-border bg-background font-mono text-[13px] shadow-none text-foreground"
                   />
-                  <p className="text-xs leading-5 text-stone-500">
+                  <p className="text-xs leading-5 text-muted-foreground">
                     填写后以该值创建；不能与管理员密钥或其他用户密钥重复。
                   </p>
                 </div>
@@ -851,11 +851,11 @@ export function UserKeysCard() {
               />
             </div>
           </div>
-          <DialogFooter className="border-t border-stone-200/80 bg-white px-6 py-4 sm:px-7">
+          <DialogFooter className="border-t border-border bg-card px-6 py-4 sm:px-7">
             <Button
               type="button"
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 rounded-xl bg-secondary px-5 text-foreground hover:bg-secondary/80"
               onClick={() => setIsDialogOpen(false)}
               disabled={isCreating}
             >
@@ -863,7 +863,7 @@ export function UserKeysCard() {
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleCreate()}
               disabled={isCreating}
             >
@@ -886,7 +886,7 @@ export function UserKeysCard() {
             <Button
               type="button"
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 rounded-xl bg-secondary px-5 text-foreground hover:bg-secondary/80"
               onClick={() => setDeletingItem(null)}
               disabled={deletingItem ? pendingIds.has(deletingItem.id) : false}
             >
@@ -910,15 +910,15 @@ export function UserKeysCard() {
       </Dialog>
 
       <Dialog open={Boolean(editingItem)} onOpenChange={(open) => (!open ? closeEditDialog() : null)}>
-        <DialogContent className="w-[min(94vw,980px)] max-h-[90vh] gap-0 overflow-hidden rounded-[24px] bg-white p-0 sm:max-w-none">
-          <DialogHeader className="border-b border-stone-200/80 bg-stone-50/70 px-6 py-5 pr-14 sm:px-7">
+        <DialogContent className="w-[min(94vw,980px)] max-h-[90vh] gap-0 overflow-hidden rounded-[24px] bg-card p-0 sm:max-w-none">
+          <DialogHeader className="border-b border-border bg-secondary/30 px-6 py-5 pr-14 sm:px-7">
             <div className="flex items-start gap-4">
-              <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-stone-200 bg-white text-stone-800 shadow-sm">
+              <div className="grid size-11 shrink-0 place-items-center rounded-2xl border border-border bg-background text-foreground shadow-sm">
                 <KeyRound className="size-5" />
               </div>
               <div className="min-w-0">
                 <DialogTitle className="text-[22px] leading-7">编辑用户密钥</DialogTitle>
-                <DialogDescription className="mt-1 max-w-2xl text-sm leading-6 text-stone-500">
+                <DialogDescription className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
                   调整身份、权限、额度和专用密钥。空白额度栏位保持当前值不变。
                 </DialogDescription>
               </div>
@@ -930,12 +930,12 @@ export function UserKeysCard() {
                 <SectionHeading title="密钥档案" hint={editingItem ? `ID ${editingItem.id}` : "基础信息"} />
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold tracking-wide text-stone-500 uppercase">名称</label>
+                    <label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">名称</label>
                     <Input
                       value={editName}
                       onChange={(event) => setEditName(event.target.value)}
                       placeholder="例如：设计同学 A、运营临时账号"
-                      className="h-12 rounded-2xl border-stone-200 bg-white shadow-none"
+                      className="h-12 rounded-2xl border-border bg-background shadow-none text-foreground"
                     />
                   </div>
                   <AccountTierSelect value={editAccountTier} onChange={setEditAccountTier} />
@@ -967,19 +967,19 @@ export function UserKeysCard() {
                   value={editKey}
                   onChange={(event) => setEditKey(event.target.value)}
                   placeholder="例如：sk-your-custom-user-key"
-                  className="h-12 rounded-2xl border-stone-200 bg-white font-mono text-[13px] shadow-none"
+                  className="h-12 rounded-2xl border-border bg-background font-mono text-[13px] shadow-none text-foreground"
                 />
-                <p className="text-xs leading-5 text-stone-500">
+                <p className="text-xs leading-5 text-muted-foreground">
                   系统仍只保存哈希，不会回显当前密钥。
                 </p>
               </section>
             </div>
           </div>
-          <DialogFooter className="border-t border-stone-200/80 bg-white px-6 py-4 sm:px-7">
+          <DialogFooter className="border-t border-border bg-card px-6 py-4 sm:px-7">
             <Button
               type="button"
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 rounded-xl bg-secondary px-5 text-foreground hover:bg-secondary/80"
               onClick={closeEditDialog}
               disabled={editingItem ? pendingIds.has(editingItem.id) : false}
             >
@@ -987,7 +987,7 @@ export function UserKeysCard() {
             </Button>
             <Button
               type="button"
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleEdit()}
               disabled={editingItem ? pendingIds.has(editingItem.id) : false}
             >
@@ -1069,21 +1069,21 @@ function KeyRow({
 
   return (
     <>
-    <tr className="border-b border-stone-100 align-middle text-sm even:bg-stone-50/40 hover:bg-stone-50">
+    <tr className="border-b border-border align-middle text-sm even:bg-muted/20 hover:bg-muted/40 transition-colors">
       <td className="px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate font-medium text-stone-800">{item.name}</span>
+          <span className="truncate font-medium text-foreground">{item.name}</span>
           <Badge
             variant={item.account_tier === "premium" ? "default" : "secondary"}
             className={cn(
               "shrink-0 rounded-md px-1.5 py-0 text-[10px]",
-              item.account_tier === "premium" ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-600",
+              item.account_tier === "premium" ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground",
             )}
           >
             {accountTierLabel(item.account_tier)}
           </Badge>
         </div>
-        <div className="mt-0.5 font-data text-[11px] text-stone-400">ID {item.id}</div>
+        <div className="mt-0.5 font-data text-[11px] text-muted-foreground">ID {item.id}</div>
       </td>
       <td className="px-4 py-3">
         <Badge variant={item.enabled ? "success" : "secondary"} className="rounded-md">
@@ -1096,10 +1096,10 @@ function KeyRow({
       <td className="px-4 py-3">
         <QuotaGroupSummary kinds={CHAT_QUOTA_KINDS} item={item} />
       </td>
-      <td className="px-4 py-3 font-data text-xs text-stone-700">{formatDateTime(item.created_at)}</td>
-      <td className="px-4 py-3 font-data text-xs text-stone-500">{formatDateTime(item.last_used_at)}</td>
+      <td className="px-4 py-3 font-data text-xs text-foreground">{formatDateTime(item.created_at)}</td>
+      <td className="px-4 py-3 font-data text-xs text-muted-foreground">{formatDateTime(item.last_used_at)}</td>
       <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-0.5 text-stone-500">
+        <div className="flex items-center justify-end gap-0.5 text-muted-foreground">
           <Popover
             open={revealOpen}
             onOpenChange={(next) => {
@@ -1114,7 +1114,7 @@ function KeyRow({
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="cursor-pointer rounded-md p-1.5 transition hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50"
+                className="cursor-pointer rounded-md p-1.5 transition hover:bg-muted hover:text-foreground disabled:opacity-50"
                 disabled={pending}
                 title="查看密钥"
               >
@@ -1173,7 +1173,7 @@ function KeyRow({
           </Popover>
           <button
             type="button"
-            className="cursor-pointer rounded-md p-1.5 transition hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50"
+            className="cursor-pointer rounded-md p-1.5 transition hover:bg-muted hover:text-foreground disabled:opacity-50"
             onClick={onEdit}
             disabled={pending}
             title="编辑"
@@ -1182,7 +1182,7 @@ function KeyRow({
           </button>
           <button
             type="button"
-            className="cursor-pointer rounded-md p-1.5 transition hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50"
+            className="cursor-pointer rounded-md p-1.5 transition hover:bg-muted hover:text-foreground disabled:opacity-50"
             onClick={onToggle}
             disabled={pending}
             title={item.enabled ? "禁用" : "启用"}
@@ -1191,7 +1191,7 @@ function KeyRow({
           </button>
           <button
             type="button"
-            className="cursor-pointer rounded-md p-1.5 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+            className="cursor-pointer rounded-md p-1.5 transition hover:bg-rose-500/10 hover:text-rose-600 disabled:opacity-50"
             onClick={onDelete}
             disabled={pending}
             title="删除"
@@ -1209,7 +1209,7 @@ function KeyRow({
             {useCustom ? (
               <>
                 确认把「{item.name}」的密钥替换为下面这个值吗？旧密钥会立即失效。
-                <span className="mt-3 block rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-[12px] break-all text-stone-800">
+                <span className="mt-3 block rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono text-[12px] break-all text-foreground">
                   {trimmedInput}
                 </span>
               </>
@@ -1222,7 +1222,7 @@ function KeyRow({
           <Button
             type="button"
             variant="secondary"
-            className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+            className="h-10 rounded-xl bg-secondary px-5 text-secondary-foreground hover:bg-secondary/80"
             onClick={() => setConfirmOpen(false)}
             disabled={regenerating}
           >
@@ -1230,7 +1230,7 @@ function KeyRow({
           </Button>
           <Button
             type="button"
-            className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+            className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
             onClick={() => void handleRegenerate()}
             disabled={regenerating}
           >
@@ -1247,8 +1247,8 @@ function KeyRow({
 function SectionHeading({ title, hint }: { title: string; hint?: string }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-2">
-      <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
-      {hint ? <p className="text-xs leading-5 text-stone-500">{hint}</p> : null}
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -1262,8 +1262,8 @@ function AccountTierSelect({
 }) {
   return (
     <div className="space-y-2">
-      <label className="text-xs font-semibold tracking-wide text-stone-500 uppercase">账号权限</label>
-      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-stone-200 bg-stone-50 p-1">
+      <label className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">账号权限</label>
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-border bg-secondary p-1">
         {ACCOUNT_TIER_OPTIONS.map((option) => {
           const selected = value === option.value;
           return (
@@ -1274,12 +1274,12 @@ function AccountTierSelect({
               className={cn(
                 "flex min-h-11 cursor-pointer flex-col items-start justify-center rounded-xl px-3 text-left transition",
                 selected
-                  ? "bg-white text-stone-950 shadow-sm ring-1 ring-stone-200"
-                  : "text-stone-500 hover:bg-white/70 hover:text-stone-800",
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
               )}
             >
               <span className="flex items-center gap-1.5 text-sm font-semibold">
-                {selected ? <CheckCircle2 className="size-3.5 text-emerald-600" /> : null}
+                {selected ? <CheckCircle2 className="size-3.5 text-emerald-500" /> : null}
                 {option.label}
               </span>
               <span className="mt-0.5 line-clamp-1 text-[11px] leading-4">{option.hint}</span>
@@ -1303,29 +1303,29 @@ function QuotaGroupSummary({ kinds, item }: { kinds: QuotaMeta[]; item: UserKey 
         return (
           <div
             key={meta.kind}
-            className="flex items-center justify-between gap-2 font-data text-[11.5px] text-stone-600"
+            className="flex items-center justify-between gap-2 font-data text-[11.5px] text-muted-foreground"
           >
-            <span className="inline-flex w-7 shrink-0 items-center justify-center rounded bg-stone-100 px-1 py-0.5 text-[10px] font-semibold tracking-wide text-stone-500">
+            <span className="inline-flex w-7 shrink-0 items-center justify-center rounded bg-secondary px-1 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground">
               {meta.shortLabel}
             </span>
             {unlimited ? (
               <span className="ml-auto inline-flex items-center gap-1.5 tabular-nums">
-                <span className="text-stone-700">已用 {used}</span>
-                <span className="inline-flex items-center gap-1 rounded-md bg-violet-50 px-1.5 py-0.5 text-[11px] font-medium text-violet-700">
+                <span className="text-foreground">已用 {used}</span>
+                <span className="inline-flex items-center gap-1 rounded-md bg-violet-500/10 px-1.5 py-0.5 text-[11px] font-medium text-violet-500">
                   <InfinityIcon className="size-3" />
                   不限
                 </span>
               </span>
             ) : exhausted ? (
-              <span className="ml-auto rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-medium text-rose-700">
+              <span className="ml-auto rounded-md bg-rose-500/10 px-1.5 py-0.5 text-[11px] font-medium text-rose-500">
                 已用完
               </span>
             ) : (
               <span className="ml-auto tabular-nums">
-                <span className="text-stone-700">
+                <span className="text-foreground">
                   {used}/{quota}
                 </span>
-                <span className="ml-1 text-stone-400">剩 {remaining}</span>
+                <span className="ml-1 text-muted-foreground">剩 {remaining}</span>
               </span>
             )}
           </div>
@@ -1351,19 +1351,19 @@ function QuotaGroupCreate({
   const GroupIcon = kinds.some((meta) => meta.kind.startsWith("image")) ? ImageIcon : MessageSquare;
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-stone-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200/80 bg-stone-50/70 px-4 py-3">
+    <section className="overflow-hidden rounded-[20px] border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl border border-stone-200 bg-white text-stone-700">
+          <span className="grid size-9 place-items-center rounded-xl border border-border bg-background text-foreground">
             <GroupIcon className="size-4" />
           </span>
           <div>
-            <div className="text-sm font-semibold text-stone-900">{title}</div>
-            <div className="text-xs leading-5 text-stone-500">{groupHint}</div>
+            <div className="text-sm font-semibold text-foreground">{title}</div>
+            <div className="text-xs leading-5 text-muted-foreground">{groupHint}</div>
           </div>
         </div>
       </div>
-      <div className="divide-y divide-stone-100">
+      <div className="divide-y divide-border">
         {kinds.map((meta) => {
           const Icon = meta.icon;
           const conf = form[meta.kind];
@@ -1373,12 +1373,12 @@ function QuotaGroupCreate({
               className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(210px,1fr)_minmax(150px,200px)_132px] sm:items-center"
             >
               <div className="flex min-w-0 items-start gap-3">
-                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-stone-100 text-stone-600">
+                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground">
                   <Icon className="size-4" />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-stone-900">{meta.label}</div>
-                  <div className="mt-0.5 text-xs leading-5 text-stone-500">{meta.hint}</div>
+                  <div className="text-sm font-semibold text-foreground">{meta.label}</div>
+                  <div className="mt-0.5 text-xs leading-5 text-muted-foreground">{meta.hint}</div>
                 </div>
               </div>
               <Input
@@ -1388,20 +1388,20 @@ function QuotaGroupCreate({
                 onChange={(event) => onChange(meta.kind, { quota: event.target.value })}
                 disabled={conf.unlimited}
                 placeholder="例如：100"
-                className="h-11 rounded-xl border-stone-200 bg-stone-50/60 font-data tabular-nums shadow-none disabled:bg-stone-100"
+                className="h-11 rounded-xl border-border bg-background/60 font-data tabular-nums shadow-none disabled:bg-secondary text-foreground"
               />
               <label
                 className={cn(
                   "flex h-11 cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 text-xs font-medium transition",
                   conf.unlimited
-                    ? "border-stone-900 bg-stone-900 text-white"
-                    : "border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100",
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-secondary text-muted-foreground hover:bg-secondary/80",
                 )}
               >
                 <Checkbox
                   checked={conf.unlimited}
                   onCheckedChange={(checked) => onChange(meta.kind, { unlimited: Boolean(checked) })}
-                  className={cn(conf.unlimited ? "border-white bg-white text-stone-900" : "bg-white")}
+                  className={cn(conf.unlimited ? "border-primary-foreground bg-primary-foreground text-primary" : "bg-background border-input")}
                 />
                 <span>不限额</span>
                 {conf.unlimited ? <InfinityIcon className="size-3.5" /> : null}
@@ -1432,19 +1432,19 @@ function QuotaGroupEdit({
   const GroupIcon = kinds.some((meta) => meta.kind.startsWith("image")) ? ImageIcon : MessageSquare;
 
   return (
-    <section className="overflow-hidden rounded-[20px] border border-stone-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200/80 bg-stone-50/70 px-4 py-3">
+    <section className="overflow-hidden rounded-[20px] border border-border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl border border-stone-200 bg-white text-stone-700">
+          <span className="grid size-9 place-items-center rounded-xl border border-border bg-background text-foreground">
             <GroupIcon className="size-4" />
           </span>
           <div>
-            <div className="text-sm font-semibold text-stone-900">{title}</div>
-            <div className="text-xs leading-5 text-stone-500">{groupHint}</div>
+            <div className="text-sm font-semibold text-foreground">{title}</div>
+            <div className="text-xs leading-5 text-muted-foreground">{groupHint}</div>
           </div>
         </div>
       </div>
-      <div className="divide-y divide-stone-100">
+      <div className="divide-y divide-border">
         {kinds.map((meta) => (
           <EditQuotaCell
             key={meta.kind}
@@ -1482,18 +1482,18 @@ function EditQuotaCell({
   return (
     <div className="grid gap-3 px-4 py-3.5 md:grid-cols-[minmax(190px,0.72fr)_minmax(0,1.28fr)] md:items-center">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-stone-100 text-stone-600">
+        <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-xl bg-secondary text-muted-foreground">
           <Icon className="size-4" />
         </span>
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-stone-900">{meta.label}</div>
-          <div className="mt-0.5 font-data text-xs leading-5 tabular-nums text-stone-500">
+          <div className="text-sm font-semibold text-foreground">{meta.label}</div>
+          <div className="mt-0.5 font-data text-xs leading-5 tabular-nums text-muted-foreground">
             {currentUnlimited ? (
               <>已用 {currentUsed} · 当前不限</>
             ) : (
               <>
                 已用 {currentUsed} / 当前 {currentQuota}
-                <span className="ml-1 text-stone-400">剩 {currentRemaining}</span>
+                <span className="ml-1 text-muted-foreground">剩 {currentRemaining}</span>
               </>
             )}
           </div>
@@ -1501,15 +1501,15 @@ function EditQuotaCell({
       </div>
       <div className="flex min-w-0 max-w-full flex-wrap items-start justify-start gap-2 md:flex-nowrap md:justify-end">
         {!value.unlimited ? (
-          <div className="inline-flex h-10 min-w-[124px] flex-[0_1_136px] rounded-xl border border-stone-200 bg-stone-50 p-1 text-xs">
+          <div className="inline-flex h-10 min-w-[124px] flex-[0_1_136px] rounded-xl border border-border bg-secondary p-1 text-xs">
             <button
               type="button"
               onClick={() => onChange({ mode: "add", quota: "" })}
               className={cn(
                 "min-w-14 flex-1 cursor-pointer rounded-lg px-3 transition",
                 value.mode === "add"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-700",
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               追加
@@ -1520,8 +1520,8 @@ function EditQuotaCell({
               className={cn(
                 "min-w-14 flex-1 cursor-pointer rounded-lg px-3 transition",
                 value.mode === "set"
-                  ? "bg-white text-stone-900 shadow-sm"
-                  : "text-stone-500 hover:text-stone-700",
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               覆盖
@@ -1536,11 +1536,11 @@ function EditQuotaCell({
             onChange={(event) => onChange({ quota: event.target.value })}
             disabled={value.unlimited}
             placeholder={value.mode === "add" ? "再追加多少" : "新的上限"}
-            className="h-10 rounded-xl border-stone-200 bg-stone-50/60 font-data tabular-nums shadow-none disabled:bg-stone-100"
+            className="h-10 rounded-xl border-border bg-background/60 font-data tabular-nums shadow-none disabled:bg-secondary text-foreground"
           />
           {hasPreview ? (
-            <p className="font-data text-[11px] leading-4 tabular-nums text-stone-500">
-              保存后 <span className="font-semibold text-stone-800">{previewNext}</span>
+            <p className="font-data text-[11px] leading-4 tabular-nums text-muted-foreground">
+              保存后 <span className="font-semibold text-foreground">{previewNext}</span>
             </p>
           ) : null}
         </div>
@@ -1548,14 +1548,14 @@ function EditQuotaCell({
           className={cn(
             "flex h-10 w-[104px] shrink-0 cursor-pointer items-center justify-between gap-2 rounded-xl border px-3 text-xs font-medium whitespace-nowrap transition",
             value.unlimited
-              ? "border-stone-900 bg-stone-900 text-white"
-              : "border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100",
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-secondary text-muted-foreground hover:bg-secondary/80",
           )}
         >
           <Checkbox
             checked={value.unlimited}
             onCheckedChange={(checked) => onChange({ unlimited: Boolean(checked) })}
-            className={cn(value.unlimited ? "border-white bg-white text-stone-900" : "bg-white")}
+            className={cn(value.unlimited ? "border-primary-foreground bg-primary-foreground text-primary" : "bg-background border-input")}
           />
           <span>不限额</span>
           {value.unlimited ? <InfinityIcon className="size-3.5" /> : null}
@@ -1568,8 +1568,8 @@ function EditQuotaCell({
           className={cn(
             "inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border text-xs font-medium transition",
             value.resetUsed
-              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-              : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50",
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
+              : "border-border bg-card text-muted-foreground hover:bg-secondary",
           )}
         >
           <RotateCcw className="size-3.5" />

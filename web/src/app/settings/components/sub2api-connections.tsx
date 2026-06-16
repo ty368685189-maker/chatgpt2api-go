@@ -399,16 +399,16 @@ export function Sub2APIConnections() {
 
   return (
     <>
-      <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+      <Card className="rounded-2xl border-border/40 bg-card shadow-sm">
         <CardContent className="space-y-6 p-6">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-stone-100">
-                <ServerCog className="size-5 text-stone-600" />
+              <div className="flex size-10 items-center justify-center rounded-xl bg-secondary">
+                <ServerCog className="size-5 text-muted-foreground" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold tracking-tight">Sub2API 连接管理</h2>
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-muted-foreground">
                   配置 Sub2API 服务器后，可查询其中的 OpenAI OAuth 账号并批量导入本地号池。
                 </p>
               </div>
@@ -416,7 +416,7 @@ export function Sub2APIConnections() {
             <div className="flex items-center gap-2">
               {servers.length > 0 ? <Badge className="rounded-md px-2.5 py-1">{servers.length} 个连接</Badge> : null}
               <Button
-                className="h-9 rounded-xl bg-stone-950 px-4 text-white hover:bg-stone-800"
+                className="h-9 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={openAddDialog}
               >
                 <Plus className="size-4" />
@@ -427,14 +427,14 @@ export function Sub2APIConnections() {
 
           {isLoading ? (
             <div className="flex items-center justify-center py-10">
-              <LoaderCircle className="size-5 animate-spin text-stone-400" />
+              <LoaderCircle className="size-5 animate-spin text-muted-foreground/50" />
             </div>
           ) : servers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-stone-50 px-6 py-10 text-center">
-              <ServerCog className="size-8 text-stone-300" />
+            <div className="flex flex-col items-center justify-center gap-3 rounded-xl bg-muted/30 px-6 py-10 text-center">
+              <ServerCog className="size-8 text-muted-foreground/30" />
               <div className="space-y-1">
-                <p className="text-sm font-medium text-stone-600">暂无 Sub2API 连接</p>
-                <p className="text-sm text-stone-400">点击「添加连接」保存你的 Sub2API 信息。</p>
+                <p className="text-sm font-medium text-foreground">暂无 Sub2API 连接</p>
+                <p className="text-sm text-muted-foreground">点击「添加连接」保存你的 Sub2API 信息。</p>
               </div>
             </div>
           ) : (
@@ -445,12 +445,12 @@ export function Sub2APIConnections() {
                 return (
                   <div
                     key={server.id}
-                    className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3"
+                    className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-stone-800">{server.name || server.base_url}</div>
-                        <div className="truncate text-xs text-stone-400">
+                        <div className="text-sm font-medium text-foreground">{server.name || server.base_url}</div>
+                        <div className="truncate text-xs text-muted-foreground">
                           {server.base_url}
                           {server.email ? ` · ${server.email}` : server.has_api_key ? " · API Key" : ""}
                           {server.group_id ? ` · 分组 ${server.group_id}` : " · 全部分组"}
@@ -459,7 +459,7 @@ export function Sub2APIConnections() {
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
+                          className="rounded-lg p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
                           onClick={() => openEditDialog(server)}
                           disabled={isBusy}
                           title="编辑"
@@ -468,7 +468,7 @@ export function Sub2APIConnections() {
                         </button>
                         <button
                           type="button"
-                          className="rounded-lg p-2 text-stone-400 transition hover:bg-rose-50 hover:text-rose-500"
+                          className="rounded-lg p-2 text-muted-foreground transition hover:bg-rose-500/10 hover:text-rose-500"
                           onClick={() => void handleDelete(server)}
                           disabled={isBusy}
                           title="删除"
@@ -485,7 +485,7 @@ export function Sub2APIConnections() {
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
-                        className="h-8 rounded-lg border-stone-200 bg-white px-3 text-xs text-stone-600"
+                        className="h-8 rounded-lg border-input bg-background px-3 text-xs text-foreground hover:bg-muted"
                         onClick={() => void handleBrowseAccounts(server)}
                         disabled={isBusy}
                       >
@@ -499,21 +499,21 @@ export function Sub2APIConnections() {
                     </div>
 
                     {importJob ? (
-                      <div className="space-y-2 rounded-xl bg-stone-50 px-3 py-3">
-                        <div className="text-xs font-medium tracking-[0.16em] text-stone-400 uppercase">导入任务</div>
+                      <div className="space-y-2 rounded-xl bg-muted/30 px-3 py-3">
+                        <div className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">导入任务</div>
                         {(() => {
                           const progress =
                             importJob.total > 0
                               ? Math.round((importJob.completed / importJob.total) * 100)
                               : 0;
                           return (
-                            <div className="rounded-lg border border-stone-200 bg-white px-3 py-3">
+                            <div className="rounded-lg border border-border bg-card px-3 py-3">
                               <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className="text-sm font-medium text-stone-700">
+                                  <div className="text-sm font-medium text-foreground">
                                     状态 {importJob.status}，已处理 {importJob.completed}/{importJob.total}
                                   </div>
-                                  <div className="truncate text-xs text-stone-400">
+                                  <div className="truncate text-xs text-muted-foreground">
                                     任务 {importJob.job_id.slice(0, 8)} · {importJob.created_at}
                                   </div>
                                 </div>
@@ -530,13 +530,13 @@ export function Sub2APIConnections() {
                                   {progress}%
                                 </Badge>
                               </div>
-                              <div className="mt-3 h-2 overflow-hidden rounded-full bg-stone-200">
+                              <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                                 <div
-                                  className="h-full rounded-full bg-stone-900 transition-all"
+                                  className="h-full rounded-full bg-primary transition-all"
                                   style={{ width: `${progress}%` }}
                                 />
                               </div>
-                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-stone-500">
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                                 <span>新增 {importJob.added}</span>
                                 <span>跳过 {importJob.skipped}</span>
                                 <span>刷新 {importJob.refreshed}</span>
@@ -553,8 +553,8 @@ export function Sub2APIConnections() {
             </div>
           )}
 
-          <div className="rounded-xl bg-stone-50 px-4 py-3 text-sm leading-6 text-stone-500">
-            <p className="font-medium text-stone-600">使用说明</p>
+          <div className="rounded-xl bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground">
+            <p className="font-medium text-foreground/80">使用说明</p>
             <ul className="mt-1 list-inside list-disc space-y-0.5">
               <li>输入 Sub2API 地址和管理员账户（或 Admin API Key），保存为一个连接。</li>
               <li>点击某个连接的「同步」会拉取其中 platform=openai 且 type=oauth 的账号列表。</li>
@@ -575,16 +575,16 @@ export function Sub2APIConnections() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-stone-700">名称（可选）</label>
+              <label className="text-sm font-medium text-foreground">名称（可选）</label>
               <Input
                 value={formName}
                 onChange={(event) => setFormName(event.target.value)}
                 placeholder="例如：自建 sub2api"
-                className="h-11 rounded-xl border-stone-200 bg-white"
+                className="h-11 rounded-xl border-input bg-background text-foreground"
               />
             </div>
             <div className="space-y-2">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Link2 className="size-3.5" />
                 Sub2API 地址
               </label>
@@ -592,13 +592,13 @@ export function Sub2APIConnections() {
                 value={formBaseUrl}
                 onChange={(event) => setFormBaseUrl(event.target.value)}
                 placeholder="http://your-sub2api-host:8080"
-                className="h-11 rounded-xl border-stone-200 bg-white"
+                className="h-11 rounded-xl border-input bg-background text-foreground"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-stone-700">认证方式</label>
+              <label className="text-sm font-medium text-foreground">认证方式</label>
               <Select value={authMode} onValueChange={(value) => setAuthMode(value as AuthMode)}>
-                <SelectTrigger className="h-11 rounded-xl border-stone-200 bg-white">
+                <SelectTrigger className="h-11 rounded-xl border-input bg-background text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -610,7 +610,7 @@ export function Sub2APIConnections() {
             {authMode === "password" ? (
               <>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                     <Mail className="size-3.5" />
                     管理员邮箱
                   </label>
@@ -618,11 +618,11 @@ export function Sub2APIConnections() {
                     value={formEmail}
                     onChange={(event) => setFormEmail(event.target.value)}
                     placeholder="admin@example.com"
-                    className="h-11 rounded-xl border-stone-200 bg-white"
+                    className="h-11 rounded-xl border-input bg-background text-foreground"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+                  <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                     <Unplug className="size-3.5" />
                     管理员密码
                   </label>
@@ -632,11 +632,11 @@ export function Sub2APIConnections() {
                       value={formPassword}
                       onChange={(event) => setFormPassword(event.target.value)}
                       placeholder={editingServer ? "留空则不修改密码" : "管理员密码"}
-                      className="h-11 rounded-xl border-stone-200 bg-white pr-10"
+                      className="h-11 rounded-xl border-input bg-background pr-10 text-foreground"
                     />
                     <button
                       type="button"
-                      className="absolute top-1/2 right-3 -translate-y-1/2 text-stone-400 transition hover:text-stone-600"
+                      className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                       onClick={() => setShowSecret((prev) => !prev)}
                     >
                       {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -646,7 +646,7 @@ export function Sub2APIConnections() {
               </>
             ) : (
               <div className="space-y-2">
-                <label className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+                <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                   <Unplug className="size-3.5" />
                   Admin API Key
                 </label>
@@ -656,11 +656,11 @@ export function Sub2APIConnections() {
                     value={formApiKey}
                     onChange={(event) => setFormApiKey(event.target.value)}
                     placeholder={editingServer ? "留空则不修改密钥" : "Sub2API Admin API Key"}
-                    className="h-11 rounded-xl border-stone-200 bg-white pr-10"
+                    className="h-11 rounded-xl border-input bg-background pr-10 text-foreground"
                   />
                   <button
                     type="button"
-                    className="absolute top-1/2 right-3 -translate-y-1/2 text-stone-400 transition hover:text-stone-600"
+                    className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition hover:text-foreground"
                     onClick={() => setShowSecret((prev) => !prev)}
                   >
                     {showSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -669,13 +669,13 @@ export function Sub2APIConnections() {
               </div>
             )}
             <div className="space-y-2">
-              <label className="flex items-center gap-1.5 text-sm font-medium text-stone-700">
+              <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Layers className="size-3.5" />
                 分组（可选）
               </label>
               {remoteGroups && remoteGroups.length > 0 ? (
                 <Select value={formGroupId || "__all__"} onValueChange={(value) => setFormGroupId(value === "__all__" ? "" : value)}>
-                  <SelectTrigger className="h-11 rounded-xl border-stone-200 bg-white">
+                  <SelectTrigger className="h-11 rounded-xl border-input bg-background text-foreground">
                     <SelectValue placeholder="选择分组" />
                   </SelectTrigger>
                   <SelectContent>
@@ -697,15 +697,15 @@ export function Sub2APIConnections() {
                   value={formGroupId}
                   onChange={(event) => setFormGroupId(event.target.value)}
                   placeholder="留空则同步所有分组；或填写分组 ID / ungrouped"
-                  className="h-11 rounded-xl border-stone-200 bg-white"
+                  className="h-11 rounded-xl border-input bg-background text-foreground"
                 />
               )}
               {editingServer ? (
-                <div className="flex items-center justify-between gap-2 text-xs text-stone-500">
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                   <span>同步时会用分组 ID 过滤，留空 = 同步所有 OpenAI OAuth 账号。</span>
                   <Button
                     variant="outline"
-                    className="h-8 rounded-lg border-stone-200 bg-white px-2 text-xs text-stone-600"
+                    className="h-8 rounded-lg border-input bg-background px-2 text-xs text-foreground hover:bg-muted"
                     onClick={() => void handleFetchGroups()}
                     disabled={isLoadingGroups}
                   >
@@ -718,7 +718,7 @@ export function Sub2APIConnections() {
                   </Button>
                 </div>
               ) : (
-                <div className="text-xs text-stone-500">
+                <div className="text-xs text-muted-foreground">
                   添加完连接后可在编辑对话框里点「拉取分组」选择具体分组。
                 </div>
               )}
@@ -727,14 +727,14 @@ export function Sub2APIConnections() {
           <DialogFooter className="pt-2">
             <Button
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80"
               onClick={() => setDialogOpen(false)}
               disabled={isSaving}
             >
               取消
             </Button>
             <Button
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleSave()}
               disabled={isSaving}
             >
@@ -756,7 +756,7 @@ export function Sub2APIConnections() {
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="relative min-w-[260px]">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" />
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={accountQuery}
                 onChange={(event) => {
@@ -764,7 +764,7 @@ export function Sub2APIConnections() {
                   setAccountPage(1);
                 }}
                 placeholder="搜索邮箱、套餐或名称"
-                className="h-10 rounded-xl border-stone-200 bg-white pl-10"
+                className="h-10 rounded-xl border-input bg-background pl-10 text-foreground"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -775,7 +775,7 @@ export function Sub2APIConnections() {
                   setAccountPage(1);
                 }}
               >
-                <SelectTrigger className="h-10 w-[120px] rounded-xl border-stone-200 bg-white">
+                <SelectTrigger className="h-10 w-[120px] rounded-xl border-input bg-background text-foreground">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -788,7 +788,7 @@ export function Sub2APIConnections() {
               </Select>
               <Button
                 variant="outline"
-                className="h-10 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+                className="h-10 rounded-xl border-input bg-background px-4 text-foreground hover:bg-muted"
                 onClick={() => handleToggleSelectAllFiltered(!allFilteredSelected)}
               >
                 {allFilteredSelected ? "取消全选" : "全选筛选结果"}
@@ -796,8 +796,8 @@ export function Sub2APIConnections() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-stone-200">
-            <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3 text-sm text-stone-500">
+          <div className="rounded-xl border border-border">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3 text-sm text-muted-foreground bg-muted/10">
               <div className="flex items-center gap-3">
                 <Checkbox
                   checked={allFilteredSelected}
@@ -807,15 +807,15 @@ export function Sub2APIConnections() {
               </div>
               <span>已选 {selectedIds.length} 个</span>
             </div>
-            <div className="max-h-[420px] overflow-auto">
+            <div className="max-h-[420px] overflow-auto scrollbar-fancy">
               {pagedAccounts.length === 0 ? (
-                <div className="flex items-center justify-center py-12 text-sm text-stone-400">没有匹配的账号</div>
+                <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">没有匹配的账号</div>
               ) : (
-                <div className="divide-y divide-stone-100">
+                <div className="divide-y divide-border">
                   {pagedAccounts.map((item) => (
                     <label
                       key={item.id}
-                      className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-stone-50"
+                      className="flex cursor-pointer items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
                     >
                       <Checkbox
                         checked={selectedIds.includes(item.id)}
@@ -823,11 +823,11 @@ export function Sub2APIConnections() {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-medium text-stone-700">
+                          <span className="truncate text-sm font-medium text-foreground">
                             {item.email || item.name || item.id}
                           </span>
                           {item.plan_type ? (
-                            <Badge className="rounded-md bg-stone-100 text-stone-600">{item.plan_type}</Badge>
+                            <Badge className="rounded-md bg-secondary text-secondary-foreground">{item.plan_type}</Badge>
                           ) : null}
                           {item.status ? (
                             <Badge
@@ -838,7 +838,7 @@ export function Sub2APIConnections() {
                             </Badge>
                           ) : null}
                         </div>
-                        <div className="truncate text-xs text-stone-400">
+                        <div className="truncate text-xs text-muted-foreground">
                           id {item.id}
                           {item.expires_at ? ` · 过期 ${item.expires_at}` : ""}
                         </div>
@@ -850,7 +850,7 @@ export function Sub2APIConnections() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm text-stone-500">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>
               第 {filteredAccounts.length === 0 ? 0 : (safeAccountPage - 1) * currentPageSize + 1} -{" "}
               {Math.min(safeAccountPage * currentPageSize, filteredAccounts.length)} 条，共 {filteredAccounts.length} 条
@@ -858,18 +858,18 @@ export function Sub2APIConnections() {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                className="h-9 rounded-xl border-stone-200 bg-white px-3"
+                className="h-9 rounded-xl border-input bg-background px-3 text-foreground hover:bg-muted"
                 onClick={() => setAccountPage((prev) => Math.max(1, prev - 1))}
                 disabled={safeAccountPage <= 1}
               >
                 上一页
               </Button>
-              <span>
+              <span className="font-data tabular-nums">
                 {safeAccountPage}/{accountPageCount}
               </span>
               <Button
                 variant="outline"
-                className="h-9 rounded-xl border-stone-200 bg-white px-3"
+                className="h-9 rounded-xl border-input bg-background px-3 text-foreground hover:bg-muted"
                 onClick={() => setAccountPage((prev) => Math.min(accountPageCount, prev + 1))}
                 disabled={safeAccountPage >= accountPageCount}
               >
@@ -881,14 +881,14 @@ export function Sub2APIConnections() {
           <DialogFooter className="pt-2">
             <Button
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 rounded-xl bg-secondary text-secondary-foreground hover:bg-secondary/80"
               onClick={() => setBrowserOpen(false)}
               disabled={isStartingImport}
             >
               取消
             </Button>
             <Button
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleStartImport()}
               disabled={isStartingImport || selectedIds.length === 0}
             >

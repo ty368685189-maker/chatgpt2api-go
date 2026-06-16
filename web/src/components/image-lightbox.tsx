@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Download, X } from "lucide-react";
+import { Download, X, Copy, Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,9 @@ type LightboxImage = {
   src: string;
   sizeLabel?: string;
   dimensions?: string;
+  prompt?: string;
+  revisedPrompt?: string;
+  referenceSrc?: string;
 };
 
 type ImageLightboxProps = {
@@ -90,6 +93,30 @@ export function ImageLightbox({
   onOpenChange,
   onIndexChange,
 }: ImageLightboxProps) {
+  const [copied, setCopied] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
+  const [sliderPosition, setSliderPosition] = useState(50);
+
+  const [aspectRatio, setAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    setIsComparing(false);
+    setAspectRatio(null);
+  }, [currentIndex]);
+
+  useEffect(() => {
+    if (!open) {
+      setIsComparing(false);
+      setAspectRatio(null);
+    }
+  }, [open]);
+  
+  const handleCopyPrompt = useCallback((text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, []);
+
   const gestureRef = useRef<TouchGesture | null>(null);
   const lastTapRef = useRef(0);
   const wheelLockRef = useRef(0);
@@ -389,6 +416,24 @@ export function ImageLightbox({
                 {currentIndex + 1} / {images.length}
               </span>
             )}
+            {current.referenceSrc && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsComparing((prev) => !prev);
+                  setTransform({ scale: minScale, x: 0, y: 0 });
+                }}
+                className={cn(
+                  "inline-flex h-9 px-3 items-center justify-center gap-1.5 rounded-full text-xs font-semibold transition shadow-md cursor-pointer",
+                  isComparing
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                    : "bg-black/50 text-white/90 hover:bg-black/70",
+                )}
+                aria-label="对比原图"
+              >
+                <span>对比原图</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleDownload}
@@ -446,25 +491,122 @@ export function ImageLightbox({
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchCancel}
           >
-            <img
-              src={current.src}
-              alt=""
-              className={cn(
-                "max-h-[90vh] max-w-[90vw] rounded-lg object-contain will-change-transform",
-                isGesturing ? "" : "transition-transform duration-150 ease-out",
-                transform.scale > minScale ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in",
-              )}
-              style={{
-                transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                toggleZoom();
-              }}
-              draggable={false}
-            />
+            {isComparing && current.referenceSrc ? (
+              <div
+                className="relative max-h-[90vh] max-w-[90vw] w-full select-none overflow-hidden rounded-lg border border-white/10"
+                style={aspectRatio ? { aspectRatio: `${aspectRatio}` } : { aspectRatio: "1/1" }}
+                onClick={(e) => e.stopPropagation()}
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                  setSliderPosition(pct);
+                }}
+                onTouchMove={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const touch = e.touches[0];
+                  if (!touch) return;
+                  const x = touch.clientX - rect.left;
+                  const pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                  setSliderPosition(pct);
+                }}
+              >
+                {/* Generated Image (After) - Underneath */}
+                <img
+                  src={current.src}
+                  alt="After"
+                  onLoad={(e) => {
+                    setAspectRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight);
+                  }}
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                  draggable={false}
+                />
+
+                {/* Reference Image (Before) - On top, clipped */}
+                <img
+                  src={current.referenceSrc}
+                  alt="Before"
+                  className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+                  style={{
+                    clipPath: `polygon(0 0, ${sliderPosition}% 0, ${sliderPosition}% 100%, 0 100%)`,
+                  }}
+                  draggable={false}
+                />
+
+                {/* Split Divider line */}
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white cursor-ew-resize z-10 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
+                  style={{ left: `${sliderPosition}%` }}
+                >
+                  {/* Handle icon */}
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex size-6 items-center justify-center rounded-full bg-white text-black shadow-md border border-gray-200 text-xs font-bold font-sans select-none">
+                    ↔
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <img
+                src={current.src}
+                alt=""
+                className={cn(
+                  "max-h-[90vh] max-w-[90vw] rounded-lg object-contain will-change-transform",
+                  isGesturing ? "" : "transition-transform duration-150 ease-out",
+                  transform.scale > minScale ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in",
+                )}
+                style={{
+                  transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(${transform.scale})`,
+                }}
+                onLoad={(e) => {
+                  setAspectRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  toggleZoom();
+                }}
+                draggable={false}
+              />
+            )}
           </div>
+
+          {current.prompt && (
+            <div
+              className="absolute bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] left-1/2 z-10 w-[90vw] max-w-[640px] -translate-x-1/2 rounded-2xl bg-black/60 p-4 text-white shadow-lg backdrop-blur-md border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-1.5">
+                <p className="text-xs font-semibold text-white/50">提示词 (Prompt)</p>
+                <button
+                  type="button"
+                  onClick={() => handleCopyPrompt(current.prompt || "")}
+                  className="inline-flex items-center gap-1 rounded bg-white/15 hover:bg-white/25 px-2 py-0.5 text-[10px] font-medium text-white transition cursor-pointer"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="size-2.5" />
+                      已复制
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="size-2.5" />
+                      复制
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[13px] leading-5 max-h-[80px] overflow-y-auto break-words select-text pr-1 text-white/90">
+                {current.prompt}
+              </p>
+              {current.revisedPrompt && (
+                <div className="mt-2 pt-2 border-t border-white/10">
+                  <p className="text-xs font-semibold text-emerald-400/80 mb-1">优化后提示词 (Revised)</p>
+                  <p className="text-xs leading-5 max-h-[60px] overflow-y-auto break-words italic select-text pr-1 text-white/80">
+                    {current.revisedPrompt}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

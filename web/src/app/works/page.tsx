@@ -12,6 +12,7 @@ import {
   Sparkles,
   Trash2,
   X,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,6 +65,54 @@ function WorksPageContent() {
   const [items, setItems] = useState<ManagedImage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [focused, setFocused] = useState<ManagedImage | null>(null);
+
+  const [favorites, setFavorites] = useState<ManagedImage[]>([]);
+  const [activeTab, setActiveTab] = useState<"all" | "favorites">("all");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("chatgpt2api:favorites");
+        if (raw) {
+          setFavorites(JSON.parse(raw));
+        }
+      } catch (err) {
+        console.error("Failed to load favorites:", err);
+      }
+    }
+  }, []);
+
+  const saveFavorites = (list: ManagedImage[]) => {
+    setFavorites(list);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("chatgpt2api:favorites", JSON.stringify(list));
+      } catch (err) {
+        console.error("Failed to save favorites:", err);
+      }
+    }
+  };
+
+  const isFavorited = useCallback((item: ManagedImage) => {
+    const key = imageKey(item);
+    return favorites.some((fav) => imageKey(fav) === key);
+  }, [favorites]);
+
+  const handleToggleFavorite = useCallback((item: ManagedImage) => {
+    const key = imageKey(item);
+    const already = favorites.some((fav) => imageKey(fav) === key);
+    let next: ManagedImage[];
+    if (already) {
+      next = favorites.filter((fav) => imageKey(fav) !== key);
+      toast.success("已取消收藏");
+    } else {
+      next = [item, ...favorites];
+      toast.success("已添加收藏");
+    }
+    saveFavorites(next);
+  }, [favorites]);
+
+  const displayedItems = activeTab === "all" ? items : favorites;
 
   // Pinterest 风格 masonry：列宽 flex-1 边到边等分容器（不留白），列数随容器宽度走。
   //   - 列数 = round((容器宽 + gap) / (目标列宽 240 + gap))
@@ -167,6 +216,10 @@ function WorksPageContent() {
   const handleRedraw = useCallback((item: ManagedImage) => {
     if (typeof window === "undefined") return;
     const rel = item.rel || item.path || "";
+    const params = new URLSearchParams();
+    if (rel) params.set("redraw_rel", rel);
+    if (item.url) params.set("redraw_url", item.url);
+    if (item.prompt) params.set("redraw_prompt", item.prompt);
     try {
       window.sessionStorage.setItem(
         REDRAW_HANDOFF_KEY,
@@ -179,7 +232,7 @@ function WorksPageContent() {
     } catch {
       // sessionStorage 写失败一般是隐私模式 / 配额满，不阻断跳转
     }
-    window.location.assign("/image");
+    window.location.assign(`/image/?${params.toString()}`);
   }, []);
 
   const handleCopyPrompt = useCallback(async (text: string) => {
@@ -302,7 +355,7 @@ function WorksPageContent() {
     }
   }, [focused, pendingDelete]);
 
-  const visibleCount = items.length;
+  const visibleCount = displayedItems.length;
 
   // 关闭弹窗时，focused 立刻置 null 会让 {focused ? ... : null} 内容瞬间从 DOM 消失，
   // 剩下空的 DialogContent 在 Radix 200ms 淡出缩放里收缩成一条白线（用户反馈的"中间闪白线"）。
@@ -336,7 +389,7 @@ function WorksPageContent() {
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 rounded-xl border-border bg-card/80 px-4 text-foreground hover:bg-secondary hover:text-foreground"
             onClick={() => void reload()}
             disabled={isLoading}
           >
@@ -346,30 +399,60 @@ function WorksPageContent() {
         </div>
       </section>
 
-      {isLoading && items.length === 0 ? (
-        <Card className="mt-6 rounded-2xl border-white/80 bg-white/90 shadow-sm">
+      {/* Tabs Selector */}
+      <div className="mt-4 flex gap-1.5 border-b border-border/50 pb-px">
+        <button
+          type="button"
+          onClick={() => setActiveTab("all")}
+          className={cn(
+            "relative px-4 py-2 text-sm font-medium transition cursor-pointer",
+            activeTab === "all" ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          全部作品
+          {activeTab === "all" && (
+            <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-full" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("favorites")}
+          className={cn(
+            "relative px-4 py-2 text-sm font-medium transition cursor-pointer",
+            activeTab === "favorites" ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          我的收藏
+          {activeTab === "favorites" && (
+            <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-full" />
+          )}
+        </button>
+      </div>
+
+      {isLoading && displayedItems.length === 0 ? (
+        <Card className="mt-6 rounded-2xl border-border bg-card shadow-sm">
           <CardContent className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-            <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
+            <div className="rounded-xl bg-secondary p-3 text-muted-foreground">
               <LoaderCircle className="size-5 animate-spin" />
             </div>
-            <p className="text-sm text-stone-500">从云端拉取你的图片…</p>
+            <p className="text-sm text-muted-foreground">从云端拉取你的图片…</p>
           </CardContent>
         </Card>
       ) : null}
 
-      {!isLoading && items.length === 0 ? (
-        <Card className="mt-6 rounded-2xl border-white/80 bg-white/90 shadow-sm">
+      {!isLoading && displayedItems.length === 0 ? (
+        <Card className="mt-6 rounded-2xl border-border bg-card shadow-sm">
           <CardContent className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-            <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
+            <div className="rounded-xl bg-secondary p-3 text-muted-foreground">
               <Images className="size-5" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-stone-700">这里还很空</p>
-              <p className="text-sm text-stone-500">去画图页生成第一张吧</p>
+              <p className="text-sm font-medium text-foreground">这里还很空</p>
+              <p className="text-sm text-muted-foreground">去画图页生成第一张吧</p>
             </div>
             <Button
               variant="outline"
-              className="mt-2 h-9 rounded-xl border-stone-200 bg-white px-4 text-stone-700 hover:bg-stone-50"
+              className="mt-2 h-9 rounded-xl border-border bg-card px-4 text-foreground hover:bg-secondary"
               onClick={() => window.location.assign("/image")}
             >
               <Sparkles className="size-4" />
@@ -396,7 +479,7 @@ function WorksPageContent() {
           const buckets: ManagedImage[][] = Array.from({ length: cols }, () => []);
           // 列内累计"高度"近似值：用 1/ratio (= height/width) 做单位列宽下的相对高度
           const heights = new Array(cols).fill(0);
-          for (const item of items) {
+          for (const item of displayedItems) {
             const w = item.width && item.width > 0 ? item.width : 1;
             const h = item.height && item.height > 0 ? item.height : 1;
             const relativeH = h / w;
@@ -425,9 +508,24 @@ function WorksPageContent() {
                     key={imageKey(item)}
                     type="button"
                     onClick={() => setFocused(item)}
-                    className="group relative w-full cursor-pointer overflow-hidden rounded-2xl bg-stone-100 text-left transition-shadow duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-stone-900 focus-visible:ring-offset-2 focus-visible:outline-none"
+                    className="group relative w-full cursor-pointer overflow-hidden rounded-2xl bg-secondary text-left transition-shadow duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
                     style={{ aspectRatio: String(ratio) }}
                   >
+                    {/* Star icon overlay */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleFavorite(item);
+                      }}
+                      className={cn(
+                        "absolute top-2 right-2 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-opacity duration-200",
+                        isFavorited(item) ? "opacity-100 text-yellow-400" : "opacity-0 group-hover:opacity-100 hover:bg-black/60",
+                      )}
+                      title={isFavorited(item) ? "取消收藏" : "加入收藏"}
+                    >
+                      <Star className={cn("size-3.5", isFavorited(item) && "fill-yellow-400")} />
+                    </button>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={item.url}
@@ -491,6 +589,20 @@ function WorksPageContent() {
                   >
                     <Download className="size-4" />
                   </button>
+                  {focusedView && (
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFavorite(focusedView)}
+                      aria-label="收藏"
+                      title={isFavorited(focusedView) ? "取消收藏" : "收藏"}
+                      className={cn(
+                        "grid size-9 cursor-pointer place-items-center rounded-full bg-black/55 backdrop-blur-sm transition hover:bg-black/75",
+                        isFavorited(focusedView) ? "text-yellow-400" : "text-white"
+                      )}
+                    >
+                      <Star className={cn("size-4", isFavorited(focusedView) && "fill-yellow-400")} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setPendingDelete(focusedView)}
@@ -518,16 +630,16 @@ function WorksPageContent() {
                 </DialogHeader>
 
                 {focusedView.prompt ? (
-                  <div className="rounded-xl bg-stone-50 p-3 text-[13px] leading-6 text-stone-800">
+                  <div className="rounded-xl bg-secondary/50 p-3 text-[13px] leading-6 text-foreground">
                     {focusedView.prompt}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/70 p-3 text-[12px] leading-6 text-stone-500">
+                  <div className="rounded-xl border border-dashed border-border bg-secondary/30 p-3 text-[12px] leading-6 text-muted-foreground">
                     此图未保留生成时的 prompt（可能是早期版本生成的）。发布到画廊时会让你手填。
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>{formatRelative(focusedView.created_at)}</span>
                   {focusedView.width && focusedView.height ? (
                     <span className="font-data">
@@ -541,14 +653,14 @@ function WorksPageContent() {
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <Button
                     onClick={() => handleRedraw(focusedView)}
-                    className="h-10 w-full rounded-xl bg-stone-950 px-3 text-white hover:bg-stone-800"
+                    className="h-10 w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 px-3"
                   >
                     <Sparkles className="size-4" />
                     用此图重画
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-10 w-full rounded-xl border-stone-200 bg-white px-3"
+                    className="h-10 w-full rounded-xl border-border bg-card px-3 text-foreground hover:bg-secondary"
                     onClick={() => void handleCopyPrompt(focusedView.prompt || "")}
                     disabled={!focusedView.prompt}
                   >
@@ -557,7 +669,7 @@ function WorksPageContent() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-10 w-full rounded-xl border-stone-200 bg-white px-3"
+                    className="h-10 w-full rounded-xl border-border bg-card px-3 text-foreground hover:bg-secondary"
                     onClick={() => void handlePublish(focusedView)}
                     disabled={focusedPublishState === "publishing" || focusedPublishState === "published"}
                   >
@@ -610,7 +722,7 @@ function WorksPageContent() {
               取消
             </Button>
             <Button
-              className="bg-stone-950 text-white hover:bg-stone-800"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleConfirmPendingPublish()}
               disabled={publishing}
             >
@@ -658,7 +770,7 @@ export default function WorksPage() {
   if (isCheckingAuth || !session) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <LoaderCircle className="size-5 animate-spin text-stone-400" />
+        <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
       </div>
     );
   }

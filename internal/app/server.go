@@ -253,7 +253,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("/v1/chat/completions", s.handleV1ChatCompletions)
 	s.mux.HandleFunc("/v1/responses", s.handleV1Responses)
 	s.mux.HandleFunc("/v1/messages", s.handleV1Messages)
-	s.mux.Handle("/images/", http.StripPrefix("/images/", http.FileServer(http.Dir(s.imagesDir))))
+	s.mux.Handle("/images/", http.StripPrefix("/images/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		http.FileServer(http.Dir(s.imagesDir)).ServeHTTP(w, r)
+	})))
 	s.mux.HandleFunc("/", s.handleWeb)
 }
 

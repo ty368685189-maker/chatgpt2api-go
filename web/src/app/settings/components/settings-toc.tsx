@@ -57,7 +57,7 @@ export function SettingsTOC({ items }: { items: TOCItem[] }) {
 
   return (
     <aside className="sticky top-24 hidden h-fit w-56 shrink-0 lg:block">
-      <div className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">
+      <div className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">
         On this page
       </div>
       <nav className="mt-3 flex flex-col gap-0.5">
@@ -72,8 +72,8 @@ export function SettingsTOC({ items }: { items: TOCItem[] }) {
                 "group relative cursor-pointer rounded-md px-3 py-1.5 text-left text-sm transition-colors duration-150",
                 "border-l-2",
                 active
-                  ? "border-stone-900 bg-stone-100/70 font-medium text-stone-900"
-                  : "border-transparent text-stone-500 hover:bg-stone-100/50 hover:text-stone-800",
+                  ? "border-primary bg-secondary/80 font-medium text-foreground"
+                  : "border-transparent text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
               )}
             >
               {it.label}

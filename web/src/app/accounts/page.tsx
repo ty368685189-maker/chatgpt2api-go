@@ -78,11 +78,11 @@ const statusMeta: Record<
 };
 
 const metricCards = [
-  { key: "total", label: "账户总数", color: "text-stone-900", icon: UserRound },
-  { key: "active", label: "正常账户", color: "text-emerald-600", icon: CheckCircle2 },
+  { key: "total", label: "账户总数", color: "text-foreground", icon: UserRound },
+  { key: "active", label: "正常账户", color: "text-emerald-500", icon: CheckCircle2 },
   { key: "limited", label: "限流账户", color: "text-orange-500", icon: CircleAlert },
   { key: "abnormal", label: "异常账户", color: "text-rose-500", icon: CircleOff },
-  { key: "disabled", label: "禁用账户", color: "text-stone-500", icon: Ban },
+  { key: "disabled", label: "禁用账户", color: "text-muted-foreground", icon: Ban },
   { key: "quota", label: "剩余额度", color: "text-blue-500", icon: RefreshCw },
 ] as const;
 
@@ -180,22 +180,22 @@ function displayAccountSource(account: Account) {
 }
 
 const TYPE_BADGE_CLASS: Record<string, string> = {
-  Free: "border-stone-200 bg-stone-50 text-stone-700",
-  Plus: "border-blue-200 bg-blue-50 text-blue-700",
-  pro: "border-violet-200 bg-violet-50 text-violet-700",
-  prolite: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  Free: "border-stone-200 bg-stone-50 text-stone-700 dark:border-stone-800 dark:bg-stone-900/50 dark:text-stone-300",
+  Plus: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800/40 dark:bg-blue-950/30 dark:text-blue-400",
+  pro: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800/40 dark:bg-violet-950/30 dark:text-violet-400",
+  prolite: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-400",
 };
 
 const SOURCE_BADGE_CLASS: Record<"Web" | "Codex", string> = {
-  Web: "border-stone-200 bg-stone-50 text-stone-600",
-  Codex: "border-cyan-200 bg-cyan-50 text-cyan-700",
+  Web: "border-stone-200 bg-stone-50 text-stone-600 dark:border-stone-800 dark:bg-stone-900/50 dark:text-stone-400",
+  Codex: "border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800/40 dark:bg-cyan-950/30 dark:text-cyan-400",
 };
 
 const STATUS_BADGE_CLASS: Record<AccountStatus, string> = {
-  正常: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  限流: "border-amber-200 bg-amber-50 text-amber-700",
-  异常: "border-rose-200 bg-rose-50 text-rose-700",
-  禁用: "border-stone-200 bg-stone-100 text-stone-600",
+  正常: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-400",
+  限流: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-400",
+  异常: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/30 dark:text-rose-400",
+  禁用: "border-stone-200 bg-stone-100 text-stone-600 dark:border-stone-850 dark:bg-stone-900/50 dark:text-stone-400",
 };
 
 function quotaUpperBound(account: Account) {
@@ -663,7 +663,7 @@ function AccountsPageContent() {
       {showProgress ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[3px] overflow-hidden bg-stone-100/40"
+          className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[3px] overflow-hidden bg-secondary/40"
         >
           <div
             className="animate-top-progress absolute top-0 left-0 h-full w-1/3 rounded-full"
@@ -686,7 +686,7 @@ function AccountsPageContent() {
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 rounded-xl border-border bg-card/80 px-4 text-foreground hover:bg-secondary hover:text-foreground"
             onClick={() => void loadAccounts()}
             disabled={showProgress}
           >
@@ -695,7 +695,7 @@ function AccountsPageContent() {
           </Button>
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 rounded-xl border-border bg-card/80 px-4 text-foreground hover:bg-secondary hover:text-foreground"
             onClick={() => void handleRefreshAccounts(accounts.map((item) => item.access_token))}
             disabled={showProgress || accounts.length === 0}
           >
@@ -712,7 +712,7 @@ function AccountsPageContent() {
           />
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 rounded-xl border-border bg-card/80 px-4 text-foreground hover:bg-secondary hover:text-foreground"
             onClick={() => downloadTokens(accounts)}
             disabled={accounts.length === 0}
           >
@@ -732,9 +732,9 @@ function AccountsPageContent() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-stone-700">状态</label>
+              <label className="text-sm font-medium text-muted-foreground">状态</label>
               <Select value={editStatus} onValueChange={(value) => setEditStatus(value as AccountStatus)}>
-                <SelectTrigger className="h-11 rounded-xl border-stone-200 bg-white">
+                <SelectTrigger className="h-11 rounded-xl border-border bg-background">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -752,14 +752,14 @@ function AccountsPageContent() {
           <DialogFooter className="pt-2">
             <Button
               variant="secondary"
-              className="h-10 rounded-xl bg-stone-100 px-5 text-stone-700 hover:bg-stone-200"
+              className="h-10 rounded-xl bg-secondary px-5 text-foreground hover:bg-secondary/80"
               onClick={() => setEditingAccount(null)}
               disabled={isUpdating}
             >
               取消
             </Button>
             <Button
-              className="h-10 rounded-xl bg-stone-950 px-5 text-white hover:bg-stone-800"
+              className="h-10 rounded-xl bg-primary px-5 text-primary-foreground hover:bg-primary/90"
               onClick={() => void handleUpdateAccount()}
               disabled={isUpdating}
             >
@@ -796,14 +796,14 @@ function AccountsPageContent() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold tracking-tight">账户列表</h2>
-            <Badge variant="secondary" className="rounded-lg bg-stone-200 px-2 py-0.5 text-stone-700">
+            <Badge variant="secondary" className="rounded-lg bg-secondary px-2 py-0.5 text-muted-foreground">
               {filteredAccounts.length}
             </Badge>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="relative min-w-[200px] flex-1 sm:flex-initial">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-stone-400" />
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => {
@@ -811,7 +811,7 @@ function AccountsPageContent() {
                   setPage(1);
                 }}
                 placeholder="搜索邮箱"
-                className="h-10 rounded-xl border-stone-200 bg-white/85 pl-10"
+                className="h-10 rounded-xl border-border bg-background pl-10 text-foreground"
               />
             </div>
             <Select
@@ -821,7 +821,7 @@ function AccountsPageContent() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white/85 sm:w-[140px]">
+              <SelectTrigger className="h-10 w-full rounded-xl border-border bg-background sm:w-[140px] text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -839,7 +839,7 @@ function AccountsPageContent() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-10 w-full rounded-xl border-stone-200 bg-white/85 sm:w-[140px]">
+              <SelectTrigger className="h-10 w-full rounded-xl border-border bg-background sm:w-[140px] text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -886,14 +886,14 @@ function AccountsPageContent() {
         </div>
 
         {isLoading && accounts.length === 0 ? (
-          <Card className="rounded-2xl border-white/80 bg-white/90 shadow-sm">
+          <Card className="rounded-2xl border-border bg-card shadow-sm">
             <CardContent className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-              <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
+              <div className="rounded-xl bg-secondary p-3 text-muted-foreground">
                 <LoaderCircle className="size-5 animate-spin" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium text-stone-700">正在加载账户</p>
-                <p className="text-sm text-stone-500">从后端同步账号列表和状态。</p>
+                <p className="text-sm font-medium text-foreground">正在加载账户</p>
+                <p className="text-sm text-muted-foreground">从后端同步账号列表和状态。</p>
               </div>
             </CardContent>
           </Card>
@@ -901,16 +901,16 @@ function AccountsPageContent() {
 
         <Card
           className={cn(
-            "overflow-hidden rounded-2xl border-white/80 bg-white/90 shadow-sm",
+            "overflow-hidden rounded-2xl border-border bg-card shadow-sm",
             isLoading && accounts.length === 0 ? "hidden" : "",
           )}
         >
           <CardContent className="space-y-0 p-0">
-            <div className="flex flex-col gap-3 border-b border-stone-100 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap items-center gap-2 text-sm text-stone-500">
+            <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <Button
                   variant="ghost"
-                  className="h-8 rounded-lg px-3 text-stone-500 hover:bg-stone-100"
+                  className="h-8 rounded-lg px-3 text-muted-foreground hover:bg-secondary hover:text-foreground"
                   onClick={() => void handleRefreshAccounts(selectedTokens)}
                   disabled={selectedTokens.length === 0 || isRefreshing}
                 >
@@ -919,7 +919,7 @@ function AccountsPageContent() {
                 </Button>
                 <Button
                   variant="ghost"
-                  className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                  className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
                   onClick={() => void handleDeleteTokens(abnormalTokens, true)}
                   disabled={abnormalTokens.length === 0 || isDeleting}
                 >
@@ -928,7 +928,7 @@ function AccountsPageContent() {
                 </Button>
                 <Button
                   variant="ghost"
-                  className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+                  className="h-8 rounded-lg px-3 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
                   onClick={() => void handleDeleteTokens(selectedTokens)}
                   disabled={selectedTokens.length === 0 || isDeleting}
                 >
@@ -936,7 +936,7 @@ function AccountsPageContent() {
                   删除所选
                 </Button>
                 {selectedIds.length > 0 ? (
-                  <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-600">
+                  <span className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
                     已选择 {selectedIds.length} 项
                   </span>
                 ) : null}
@@ -1085,7 +1085,7 @@ function AccountsPageContent() {
                             </button>
                             <button
                               type="button"
-                              className="cursor-pointer rounded-md p-1.5 transition hover:bg-rose-50 hover:text-rose-500"
+                              className="cursor-pointer rounded-md p-1.5 transition hover:bg-rose-500/10 hover:text-rose-500"
                               onClick={() => void handleDeleteTokens([account.access_token])}
                               disabled={isDeleting}
                             >
@@ -1130,25 +1130,25 @@ function AccountsPageContent() {
 
             {!isLoading && currentRows.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-                <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
+                <div className="rounded-xl bg-secondary p-3 text-muted-foreground">
                   <Search className="size-5" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-stone-700">没有匹配的账户</p>
-                  <p className="text-sm text-stone-500">调整筛选条件或搜索关键字后重试。</p>
+                  <p className="text-sm font-medium text-foreground">没有匹配的账户</p>
+                  <p className="text-sm text-muted-foreground">调整筛选条件或搜索关键字后重试。</p>
                 </div>
               </div>
             ) : null}
 
-            <div className="border-t border-stone-100 px-4 py-4">
+            <div className="border-t border-border px-4 py-4">
               <div className="flex items-center justify-center gap-3 overflow-x-auto whitespace-nowrap">
-                <div className="shrink-0 text-sm text-stone-500">
+                <div className="shrink-0 text-sm text-muted-foreground">
                 显示第 {filteredAccounts.length === 0 ? 0 : startIndex + 1} -{" "}
                 {Math.min(startIndex + Number(pageSize), filteredAccounts.length)} 条，共{" "}
                 {filteredAccounts.length} 条
                 </div>
 
-                <span className="shrink-0 text-sm leading-none text-stone-500">
+                <span className="shrink-0 text-sm leading-none text-muted-foreground">
                   {safePage} / {pageCount} 页
                 </span>
                 <Select
@@ -1158,7 +1158,7 @@ function AccountsPageContent() {
                     setPage(1);
                   }}
                 >
-                  <SelectTrigger className="h-10 w-[108px] shrink-0 rounded-lg border-stone-200 bg-white text-sm leading-none">
+                  <SelectTrigger className="h-10 w-[108px] shrink-0 rounded-lg border-border bg-background text-sm leading-none text-foreground">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1171,7 +1171,7 @@ function AccountsPageContent() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="size-10 shrink-0 rounded-lg border-stone-200 bg-white"
+                  className="size-10 shrink-0 rounded-lg border-border bg-background text-foreground hover:bg-secondary"
                   disabled={safePage <= 1}
                   onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                 >
@@ -1179,7 +1179,7 @@ function AccountsPageContent() {
                 </Button>
                 {paginationItems.map((item, index) =>
                   item === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-1 text-sm text-stone-400">
+                    <span key={`ellipsis-${index}`} className="px-1 text-sm text-muted-foreground">
                       ...
                     </span>
                   ) : (
@@ -1189,8 +1189,8 @@ function AccountsPageContent() {
                       className={cn(
                         "h-10 min-w-10 shrink-0 rounded-lg px-3",
                         item === safePage
-                          ? "bg-stone-950 text-white hover:bg-stone-800"
-                          : "border-stone-200 bg-white text-stone-700",
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                          : "border-border bg-background text-foreground hover:bg-secondary",
                       )}
                       onClick={() => setPage(item)}
                     >
@@ -1201,7 +1201,7 @@ function AccountsPageContent() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="size-10 shrink-0 rounded-lg border-stone-200 bg-white"
+                  className="size-10 shrink-0 rounded-lg border-border bg-background text-foreground hover:bg-secondary"
                   disabled={safePage >= pageCount}
                   onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
                 >
@@ -1222,7 +1222,7 @@ export default function AccountsPage() {
   if (isCheckingAuth || !session || session.role !== "admin") {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <LoaderCircle className="size-5 animate-spin text-stone-400" />
+        <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
       </div>
     );
   }

@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Github } from "lucide-react";
+import { Github, Sun, Moon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { clearAuthSessionCache, getValidatedAuthSession } from "@/lib/auth-session";
 import { cn } from "@/lib/utils";
 import { clearStoredAuthSession, type StoredAuthSession } from "@/store/auth";
 import { QuotaPopover } from "@/components/quota-popover";
+import { useTheme } from "@/hooks/use-theme";
 
 const adminNavItems = [
   { href: "/chat", label: "对话" },
   { href: "/image", label: "画图" },
+  { href: "/templates", label: "提示词模板" },
   { href: "/gallery", label: "画廊" },
   { href: "/accounts", label: "号池管理" },
   { href: "/image-manager", label: "图片管理" },
@@ -27,6 +29,7 @@ const adminNavItems = [
 const userNavItems = [
   { href: "/chat", label: "对话" },
   { href: "/image", label: "画图" },
+  { href: "/templates", label: "提示词模板" },
   { href: "/works", label: "我的作品" },
   { href: "/gallery", label: "画廊" },
   { href: "/announcement", label: "📢 公告" },
@@ -45,6 +48,7 @@ type Rect = { left: number; width: number };
 export function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
   const [session, setSession] = useState<StoredAuthSession | null | undefined>(undefined);
 
   useEffect(() => {
@@ -250,6 +254,19 @@ export function TopNav() {
             ) : null}
             <QuotaPopover />
           </span>
+          <button
+            type="button"
+            className="flex cursor-pointer items-center justify-center rounded-md border border-transparent p-1.5 text-muted-foreground transition hover:border-border/70 hover:bg-card hover:text-foreground"
+            onClick={toggleTheme}
+            title={theme === "light" ? "切换至暗色主题" : "切换至亮色主题"}
+            aria-label="Toggle theme"
+          >
+            {theme === "light" ? (
+              <Moon className="size-[15px]" strokeWidth={2.5} />
+            ) : (
+              <Sun className="size-[15px]" strokeWidth={2.5} />
+            )}
+          </button>
           <button
             type="button"
             className="cursor-pointer rounded-md border border-transparent px-2 py-1 text-[13px] font-bold leading-none text-muted-foreground transition hover:border-border/70 hover:bg-card hover:text-foreground"

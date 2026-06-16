@@ -213,11 +213,24 @@ func (s *Server) handleImageTaskGeneration(w http.ResponseWriter, r *http.Reques
 	if b.N < 1 {
 		b.N = 1
 	}
-	if b.N > 4 {
-		b.N = 4
-	}
 	t := ImageTask{ID: firstNonEmpty(strings.TrimSpace(b.ClientTaskID), randID(8)), OwnerID: id.ID, Status: "running", Mode: "generate", Model: b.Model, Size: b.Size, Resolution: b.Resolution, CreatedAt: nowISO(), UpdatedAt: nowISO()}
 	callID := s.logCallStart(id, "/api/image-tasks/generations", b.Model, "文生图任务", b.Prompt)
+	if b.N > 4 {
+		t.Status = "error"
+		t.Error = "目前每次最多只能生成 4 张图片"
+		s.logCallFailure(callID, "/api/image-tasks/generations", b.Model, "文生图任务", fmt.Errorf("image count exceeds limit: %d", b.N), nil)
+		s.saveTask(t)
+		writeJSON(w, 200, t)
+		return
+	}
+	if b.Resolution != "" && strings.ToLower(b.Resolution) != "1k" {
+		t.Status = "error"
+		t.Error = "目前仅支持 1K 分辨率"
+		s.logCallFailure(callID, "/api/image-tasks/generations", b.Model, "文生图任务", fmt.Errorf("resolution exceeds limit: %s", b.Resolution), nil)
+		s.saveTask(t)
+		writeJSON(w, 200, t)
+		return
+	}
 	if err := s.checkContent(b.Prompt); err != nil {
 		t.Status = "error"
 		t.Error = err.Error()
@@ -243,7 +256,7 @@ func (s *Server) handleImageTaskGeneration(w http.ResponseWriter, r *http.Reques
 		for i := 0; i < b.N; i++ {
 			items, err := s.generateImageWithPool(ctx, b.Prompt, b.Model, b.Size, b.Resolution, nil)
 			if err != nil {
-				s.refundImage(identity, b.N)
+				s.refundImage(identity, b.N - i)
 				if ctx.Err() != nil {
 					s.updateTaskStatus(task.ID, "canceled", "canceled", nil)
 					s.logCallFailure(callID, "/api/image-tasks/generations", b.Model, "文生图任务", errors.New("canceled"), map[string]any{"task_id": task.ID})
@@ -256,7 +269,7 @@ func (s *Server) handleImageTaskGeneration(w http.ResponseWriter, r *http.Reques
 			for _, res := range items {
 				rel, url, err := s.saveImage(r, res.Bytes)
 				if err != nil {
-					s.refundImage(identity, b.N)
+					s.refundImage(identity, b.N - i)
 					s.updateTaskStatus(task.ID, "error", err.Error(), nil)
 					return
 				}
@@ -321,6 +334,25 @@ func (s *Server) handleImageTaskEdit(w http.ResponseWriter, r *http.Request) {
 		s.refundImage(id, 1)
 		t.Status = "error"
 		t.Error = "image file is required"
+		s.saveTask(t)
+		writeJSON(w, 200, t)
+		return
+	}
+	resolution := r.FormValue("resolution")
+	if resolution != "" && strings.ToLower(resolution) != "1k" {
+		s.refundImage(id, 1)
+		t.Status = "error"
+		t.Error = "目前仅支持 1K 分辨率"
+		s.logCallFailure(callID, "/api/image-tasks/edits", model, "图生图任务", fmt.Errorf("resolution exceeds limit: %s", resolution), nil)
+		s.saveTask(t)
+		writeJSON(w, 200, t)
+		return
+	}
+	if len(inputs) > 3 {
+		s.refundImage(id, 1)
+		t.Status = "error"
+		t.Error = "参考图数量超限，最多支持 3 张参考图"
+		s.logCallFailure(callID, "/api/image-tasks/edits", model, "图生图任务", fmt.Errorf("reference images count exceeds limit: %d", len(inputs)), nil)
 		s.saveTask(t)
 		writeJSON(w, 200, t)
 		return
@@ -849,9 +881,17 @@ func (s *Server) handleWeb(w http.ResponseWriter, r *http.Request) {
 		rel := filepath.Clean("/" + r.URL.Path)
 		rel = strings.TrimPrefix(rel, "/")
 		path := filepath.Join(s.webDist, filepath.FromSlash(rel))
-		if st, err := os.Stat(path); err == nil && !st.IsDir() {
-			http.ServeFile(w, r, path)
-			return
+		if st, err := os.Stat(path); err == nil {
+			if st.IsDir() {
+				indexPath := filepath.Join(path, "index.html")
+				if indexSt, err := os.Stat(indexPath); err == nil && !indexSt.IsDir() {
+					http.ServeFile(w, r, indexPath)
+					return
+				}
+			} else {
+				http.ServeFile(w, r, path)
+				return
+			}
 		}
 	}
 	index := filepath.Join(s.webDist, "index.html")

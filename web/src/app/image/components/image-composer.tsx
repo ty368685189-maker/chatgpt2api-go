@@ -1,5 +1,6 @@
 "use client";
-import { ArrowUp, Check, ChevronDown, CornerDownRight, ImagePlus, Infinity as InfinityIcon, X } from "lucide-react";
+import { ArrowUp, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight, ImagePlus, Infinity as InfinityIcon, Trash2, X } from "lucide-react";
+import Link from "next/link";
 import {
   useEffect,
   useLayoutEffect,
@@ -38,6 +39,12 @@ const RESOLUTION_OPTIONS: ResolutionOption[] = [
 const TEXTAREA_MIN_HEIGHT = 96;
 const TEXTAREA_MAX_HEIGHT = 360;
 
+type PromptTemplate = {
+  id: string;
+  name: string;
+  content: string;
+};
+
 type ReplyTarget = {
   sourcePrompt: string;
   aiMessage: string;
@@ -55,6 +62,7 @@ type ImageComposerProps = {
   textareaRef: RefObject<HTMLTextAreaElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   replyTarget?: ReplyTarget | null;
+  lastPrompt?: string;
   onCancelReply?: () => void;
   onPromptChange: (value: string) => void;
   onImageCountChange: (value: string) => void;
@@ -64,6 +72,8 @@ type ImageComposerProps = {
   onPickReferenceImage: () => void;
   onReferenceImageChange: (files: File[]) => void | Promise<void>;
   onRemoveReferenceImage: (index: number) => void;
+  onReorderReferenceImages: (dragIndex: number, hoverIndex: number) => void;
+  countOptions?: number[];
 };
 
 export function ImageComposer({
@@ -78,6 +88,7 @@ export function ImageComposer({
   textareaRef,
   fileInputRef,
   replyTarget,
+  lastPrompt,
   onCancelReply,
   onPromptChange,
   onImageCountChange,
@@ -87,6 +98,8 @@ export function ImageComposer({
   onPickReferenceImage,
   onReferenceImageChange,
   onRemoveReferenceImage,
+  onReorderReferenceImages,
+  countOptions = [1, 2, 3, 4],
 }: ImageComposerProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -97,6 +110,43 @@ export function ImageComposer({
   const [isCountMenuOpen, setIsCountMenuOpen] = useState(false);
   const [countMenuPos, setCountMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleDragStartItem = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const handleDragOverItem = (e: React.DragEvent, index: number) => {
+    if (draggedIndex === null) return;
+    e.preventDefault();
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragLeaveItem = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDropItem = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+    onReorderReferenceImages(draggedIndex, targetIndex);
+    setDraggedIndex(null);
+  };
+
+  const handleDragEndItem = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
   const dragCounterRef = useRef(0);
   const sizeMenuRef = useRef<HTMLDivElement>(null);
   const sizeMenuBtnRef = useRef<HTMLButtonElement>(null);
@@ -104,6 +154,72 @@ export function ImageComposer({
   const resolutionMenuBtnRef = useRef<HTMLButtonElement>(null);
   const countMenuRef = useRef<HTMLDivElement>(null);
   const countMenuBtnRef = useRef<HTMLButtonElement>(null);
+
+  const [isTemplateMenuOpen, setIsTemplateMenuOpen] = useState(false);
+  const [templateMenuPos, setTemplateMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [newTemplateName, setNewTemplateName] = useState("");
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
+  const templateMenuBtnRef = useRef<HTMLButtonElement>(null);
+
+  const STORAGE_KEY = "chatgpt2api:prompt_templates";
+
+  const DEFAULT_TEMPLATES: PromptTemplate[] = [];
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          setTemplates(JSON.parse(raw));
+        } else {
+          setTemplates([]);
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+        }
+      } catch {
+        setTemplates([]);
+      }
+    }
+  }, []);
+
+  const saveTemplate = () => {
+    if (!prompt.trim() || !newTemplateName.trim()) return;
+    const newTpl: PromptTemplate = {
+      id: `custom-${Date.now()}`,
+      name: newTemplateName.trim(),
+      content: prompt.trim(),
+    };
+    const updated = [...templates, newTpl];
+    setTemplates(updated);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+    setNewTemplateName("");
+  };
+
+  const deleteTemplate = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = templates.filter((t) => t.id !== id);
+    setTemplates(updated);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
+  };
+
+  useEffect(() => {
+    if (!isTemplateMenuOpen) {
+      return;
+    }
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!templateMenuRef.current?.contains(event.target as Node)) {
+        setIsTemplateMenuOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [isTemplateMenuOpen]);
   const lightboxImages = useMemo(
     () => referenceImages.map((image, index) => ({ id: `${image.name}-${index}`, src: image.dataUrl })),
     [referenceImages],
@@ -119,7 +235,7 @@ export function ImageComposer({
 
     textarea.style.height = "auto";
     const nextHeight = Math.min(
-      Math.max(textarea.scrollHeight, TEXTAREA_MIN_HEIGHT),
+      textarea.scrollHeight,
       TEXTAREA_MAX_HEIGHT,
     );
     textarea.style.height = `${nextHeight}px`;
@@ -170,6 +286,19 @@ export function ImageComposer({
       window.removeEventListener("mousedown", handlePointerDown);
     };
   }, [isCountMenuOpen]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsSizeMenuOpen(false);
+      setIsResolutionMenuOpen(false);
+      setIsCountMenuOpen(false);
+      setIsTemplateMenuOpen(false);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
 
   const handleTextareaPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
@@ -261,45 +390,94 @@ export function ImageComposer({
         {referenceImages.length > 0 && !replyTarget ? (
           <div className="pointer-events-none absolute right-1 bottom-full left-1 z-10 sm:right-0 sm:left-0">
             <div className="pointer-events-auto mb-2 flex gap-2 overflow-x-auto px-1 pb-1 sm:mb-3 sm:flex-wrap sm:overflow-visible sm:pb-0">
-              {referenceImages.map((image, index) => (
-                <div key={`${image.name}-${index}`} className="relative size-14 shrink-0 sm:size-16">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLightboxIndex(index);
-                      setLightboxOpen(true);
-                    }}
-                    className="group size-14 overflow-hidden rounded-2xl border border-stone-200 bg-stone-50 transition hover:border-stone-300 sm:size-16"
-                    aria-label={`预览参考图 ${image.name || index + 1}`}
+              {referenceImages.map((image, index) => {
+                const isDragged = draggedIndex === index;
+                const isOver = dragOverIndex === index;
+                return (
+                  <div
+                    key={`${image.name}-${index}`}
+                    draggable={true}
+                    onDragStart={(e) => handleDragStartItem(e, index)}
+                    onDragOver={(e) => handleDragOverItem(e, index)}
+                    onDragLeave={handleDragLeaveItem}
+                    onDrop={(e) => handleDropItem(e, index)}
+                    onDragEnd={handleDragEndItem}
+                    className={cn(
+                      "relative size-14 shrink-0 sm:size-16 transition-all duration-200 cursor-grab active:cursor-grabbing select-none",
+                      isDragged && "opacity-30 scale-90",
+                      isOver && "scale-105 ring-2 ring-primary ring-offset-2 ring-offset-background z-20 rounded-2xl"
+                    )}
                   >
-                    <img
-                      src={image.dataUrl}
-                      alt={image.name || `参考图 ${index + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRemoveReferenceImage(index);
-                    }}
-                    className="absolute -right-1 -top-1 inline-flex size-5 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-500 transition hover:border-stone-300 hover:text-stone-800"
-                    aria-label={`移除参考图 ${image.name || index + 1}`}
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLightboxIndex(index);
+                        setLightboxOpen(true);
+                      }}
+                      className="group size-14 overflow-hidden rounded-2xl border border-border bg-muted/30 transition hover:border-muted-foreground/30 sm:size-16"
+                      aria-label={`预览参考图 ${image.name || index + 1}`}
+                    >
+                      <img
+                        src={image.dataUrl}
+                        alt={image.name || `参考图 ${index + 1}`}
+                        className="h-full w-full object-cover pointer-events-none"
+                      />
+                    </button>
+                    {referenceImages.length > 1 && index > 0 && (
+                      <button
+                        type="button"
+                        draggable={false}
+                        onDragStart={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onReorderReferenceImages(index, index - 1);
+                        }}
+                        className="absolute left-0.5 top-1/2 -translate-y-1/2 flex size-4.5 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80 active:scale-90 z-20 shadow-[0_2px_4px_rgba(0,0,0,0.2)]"
+                        title="向前移动"
+                      >
+                        <ChevronLeft className="size-3" />
+                      </button>
+                    )}
+                    {referenceImages.length > 1 && index < referenceImages.length - 1 && (
+                      <button
+                        type="button"
+                        draggable={false}
+                        onDragStart={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onReorderReferenceImages(index, index + 1);
+                        }}
+                        className="absolute right-0.5 top-1/2 -translate-y-1/2 flex size-4.5 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80 active:scale-90 z-20 shadow-[0_2px_4px_rgba(0,0,0,0.2)]"
+                        title="向后移动"
+                      >
+                        <ChevronRight className="size-3" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      draggable={false}
+                      onDragStart={(e) => e.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRemoveReferenceImage(index);
+                      }}
+                      className="absolute -right-1 -top-1 inline-flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground transition hover:bg-secondary hover:text-foreground relative after:absolute after:inset-[-8px] after:content-['']"
+                      aria-label={`移除参考图 ${image.name || index + 1}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ) : null}
 
         <div
           className={cn(
-            "relative overflow-hidden rounded-[28px] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_24px_rgba(15,23,42,0.08)] transition sm:rounded-[32px]",
+            "relative overflow-hidden rounded-[28px] bg-card border border-border/60 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_4px_24px_rgba(15,23,42,0.08)] transition sm:rounded-[32px]",
             activeTaskCount > 0 && "image-composer-running",
-            isDraggingOver && "ring-2 ring-stone-900/70 ring-offset-2 ring-offset-white",
+            isDraggingOver && "ring-2 ring-ring ring-offset-2 ring-offset-background",
           )}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
@@ -321,20 +499,20 @@ export function ImageComposer({
             />
             {replyTarget ? (
               <div
-                className="mx-3 mt-3 flex items-start gap-2 rounded-2xl border border-stone-200/80 bg-stone-50/80 px-3 py-2 sm:mx-5 sm:mt-4"
+                className="mx-3 mt-3 flex items-start gap-2 rounded-2xl border border-border bg-secondary/30 px-3 py-2 sm:mx-5 sm:mt-4"
                 onClick={(event) => event.stopPropagation()}
               >
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-white text-stone-500 ring-1 ring-stone-200">
+                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-card text-muted-foreground ring-1 ring-border">
                   <CornerDownRight className="size-3" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-stone-500">
+                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                     <span>正在回复 AI 的提问</span>
-                    <span className="text-stone-300">·</span>
-                    <span className="text-stone-400">无需粘贴原文，模型会自动收到上下文</span>
+                    <span className="text-muted-foreground/30">·</span>
+                    <span className="text-muted-foreground/60">无需粘贴原文，模型会自动收到上下文</span>
                   </div>
                   {replyTarget.aiMessage ? (
-                    <p className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-stone-600 sm:text-[13px]">
+                    <p className="mt-0.5 line-clamp-2 text-[12px] leading-5 text-foreground/80 sm:text-[13px]">
                       {replyTarget.aiMessage}
                     </p>
                   ) : null}
@@ -343,7 +521,7 @@ export function ImageComposer({
                   <button
                     type="button"
                     onClick={onCancelReply}
-                    className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-stone-400 transition hover:bg-stone-200 hover:text-stone-700"
+                    className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground relative after:absolute after:inset-[-8px] after:content-['']"
                     aria-label="取消回复"
                   >
                     <X className="size-3.5" />
@@ -356,6 +534,7 @@ export function ImageComposer({
               value={prompt}
               onChange={(event) => onPromptChange(event.target.value)}
               onPaste={handleTextareaPaste}
+              maxLength={1000}
               placeholder={
                 replyTarget
                   ? "输入你的回答…"
@@ -364,34 +543,181 @@ export function ImageComposer({
                     : "输入你想要生成的画面，也可直接粘贴图片"
               }
               onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
+                if (event.nativeEvent.isComposing) return;
+                
+                if (event.key === "ArrowUp" && !prompt) {
                   event.preventDefault();
-                  void onSubmit();
+                  if (lastPrompt) {
+                    onPromptChange(lastPrompt);
+                  }
+                  return;
+                }
+
+                if (event.key === "Enter") {
+                  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches;
+                  const isForceSubmit = event.ctrlKey || event.metaKey;
+                  
+                  if (isForceSubmit || (!event.shiftKey && !isMobile)) {
+                    event.preventDefault();
+                    void onSubmit();
+                  }
                 }
               }}
-              className="hide-scrollbar min-h-[82px] resize-none overflow-hidden rounded-[24px] border-0 bg-transparent px-4 pt-4 pb-2 text-[15px] leading-6 text-stone-900 shadow-none placeholder:text-stone-400 focus-visible:ring-0 sm:min-h-[96px] sm:rounded-[32px] sm:px-6 sm:pt-6 sm:pb-2 sm:leading-7"
+              className="hide-scrollbar min-h-[82px] resize-none overflow-hidden rounded-[24px] border-0 bg-transparent pl-4 pr-10 pt-4 pb-4 text-base sm:text-[15px] leading-6 text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-0 sm:min-h-[96px] sm:rounded-[32px] sm:pl-6 sm:pr-12 sm:pt-6 sm:pb-4 sm:leading-7"
             />
+            {prompt ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPromptChange("");
+                  textareaRef.current?.focus();
+                }}
+                className="absolute right-4 top-4 z-10 flex size-6 cursor-pointer items-center justify-center rounded-full text-muted-foreground/40 hover:bg-secondary hover:text-foreground transition-colors sm:right-6 sm:top-6 relative after:absolute after:inset-[-8px] after:content-['']"
+                aria-label="清空提示词"
+              >
+                <X className="size-4" />
+              </button>
+            ) : null}
 
-            <div className="rounded-b-[24px] border-t border-stone-100 bg-white px-3 pb-3 pt-2 sm:border-t-0 sm:px-6 sm:pb-5 sm:pt-3" onClick={(event) => event.stopPropagation()}>
+            <div className="rounded-b-[24px] border-t border-border bg-card px-3 pb-3 pt-2 sm:border-t-0 sm:px-6 sm:pb-5 sm:pt-3" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-end justify-between gap-2 sm:gap-3">
                 <div className="hide-scrollbar flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0">
                   <button
                     type="button"
-                    className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-stone-100 px-3 text-[12px] font-medium text-stone-700 transition hover:bg-stone-200 sm:h-10 sm:gap-2 sm:px-4 sm:text-[13px]"
+                    className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-[12px] font-medium text-secondary-foreground transition hover:bg-secondary/80 sm:h-10 sm:gap-2 sm:px-4 sm:text-[13px]"
                     onClick={onPickReferenceImage}
                     aria-label={referenceImages.length > 0 ? "添加参考图" : "上传参考图"}
                   >
                     <ImagePlus className="size-3.5 sm:size-4" strokeWidth={2} />
                     <span>{referenceImages.length > 0 ? "添加" : "上传"}</span>
                   </button>
-                  <span className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-stone-100 px-3 text-[12px] font-medium text-stone-500 sm:h-10 sm:px-3.5 sm:text-[13px]">
+                  <span className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-secondary px-3 text-[12px] font-medium text-muted-foreground sm:h-10 sm:px-3.5 sm:text-[13px]">
                     <span className="hidden sm:inline">剩余</span>
                     {availableQuota === "∞" ? (
-                      <InfinityIcon className="size-3.5 text-stone-900 sm:size-4" strokeWidth={2.25} aria-label="不限额度" />
+                      <InfinityIcon className="size-3.5 text-foreground sm:size-4" strokeWidth={2.25} aria-label="不限额度" />
                     ) : (
-                      <span className="font-data tabular-nums text-stone-900">{availableQuota}</span>
+                      <span className="font-data tabular-nums text-foreground">{availableQuota}</span>
                     )}
                   </span>
+                  
+                  <div className="relative shrink-0">
+                    <button
+                      ref={templateMenuBtnRef}
+                      type="button"
+                      className={cn(
+                        "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition sm:h-10 sm:gap-2 sm:px-4 sm:text-[13px]",
+                        isTemplateMenuOpen
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                      )}
+                      onClick={() => {
+                        setIsSizeMenuOpen(false);
+                        setIsResolutionMenuOpen(false);
+                        setIsCountMenuOpen(false);
+                        if (!isTemplateMenuOpen && templateMenuBtnRef.current) {
+                          const rect = templateMenuBtnRef.current.getBoundingClientRect();
+                          const menuWidth = Math.min(280, window.innerWidth - 32);
+                          setTemplateMenuPos({
+                            top: rect.top - 8,
+                            left: Math.max(16, Math.min(rect.left, window.innerWidth - menuWidth - 16)),
+                          });
+                        }
+                        setIsTemplateMenuOpen((open) => !open);
+                      }}
+                    >
+                      <BookOpen className="size-3.5 shrink-0 opacity-80" strokeWidth={2} />
+                      <span>模板</span>
+                      <ChevronDown
+                        className={cn(
+                          "size-3.5 shrink-0 opacity-60 transition",
+                          isTemplateMenuOpen && "rotate-180",
+                        )}
+                      />
+                    </button>
+                    {isTemplateMenuOpen ? (
+                      <div
+                        ref={templateMenuRef}
+                        className="fixed z-[80] rounded-2xl border border-border bg-card p-3 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)] flex flex-col gap-2.5 max-h-[50dvh] overflow-y-auto hide-scrollbar"
+                        style={{
+                          top: templateMenuPos.top,
+                          left: templateMenuPos.left,
+                          transform: "translateY(-100%)",
+                          width: "min(280px, calc(100vw - 2rem))",
+                        }}
+                      >
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-[11px] font-medium text-muted-foreground">提示词模板</span>
+                          <Link
+                            href="/templates"
+                            className="text-[11px] font-medium text-primary hover:underline transition-colors"
+                            onClick={() => setIsTemplateMenuOpen(false)}
+                          >
+                            管理模板
+                          </Link>
+                        </div>
+                        <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1 hide-scrollbar">
+                          {templates.length === 0 ? (
+                            <div className="text-[12px] text-muted-foreground py-4 text-center">
+                              暂无模板，在下方保存新模板
+                            </div>
+                          ) : (
+                            templates.map((tpl) => (
+                              <div
+                                key={tpl.id}
+                                className="group/item flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-secondary text-left transition cursor-pointer"
+                                onClick={() => {
+                                  onPromptChange(tpl.content);
+                                  setIsTemplateMenuOpen(false);
+                                  textareaRef.current?.focus();
+                                }}
+                              >
+                                <div className="min-w-0 flex-1 pr-2">
+                                  <div className="text-[13px] font-medium text-foreground truncate">{tpl.name}</div>
+                                  <div className="text-[11px] text-muted-foreground truncate leading-normal">{tpl.content}</div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => deleteTemplate(tpl.id, e)}
+                                  className="opacity-0 group-hover/item:opacity-100 p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"
+                                  title="删除模板"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="border-t border-border pt-2.5 mt-0.5 flex flex-col gap-2">
+                          <div className="text-[11px] font-medium text-muted-foreground px-1">保存当前输入为模板</div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="模板名称"
+                              value={newTemplateName}
+                              onChange={(e) => setNewTemplateName(e.target.value)}
+                              className="flex-1 h-8 rounded-lg border border-input bg-transparent px-2.5 text-[12px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  saveTemplate();
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              disabled={!prompt.trim() || !newTemplateName.trim()}
+                              onClick={saveTemplate}
+                              className="h-8 shrink-0 rounded-lg bg-primary px-3 text-[12px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                            >
+                              保存
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
                   <div className="relative shrink-0">
                     <button
                       ref={countMenuBtnRef}
@@ -399,10 +725,13 @@ export function ImageComposer({
                       className={cn(
                         "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition sm:h-10 sm:gap-2 sm:px-4 sm:text-[13px]",
                         isCountMenuOpen
-                          ? "bg-stone-900 text-white"
-                          : "bg-stone-100 text-stone-700 hover:bg-stone-200",
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
                       )}
                       onClick={() => {
+                        setIsSizeMenuOpen(false);
+                        setIsResolutionMenuOpen(false);
+                        setIsTemplateMenuOpen(false);
                         if (!isCountMenuOpen && countMenuBtnRef.current) {
                           const rect = countMenuBtnRef.current.getBoundingClientRect();
                           const menuWidth = Math.min(212, window.innerWidth - 32);
@@ -414,7 +743,7 @@ export function ImageComposer({
                         setIsCountMenuOpen((open) => !open);
                       }}
                     >
-                      <span className={cn("hidden sm:inline", isCountMenuOpen ? "text-white/70" : "text-stone-500")}>张数</span>
+                      <span className={cn("hidden sm:inline", isCountMenuOpen ? "text-primary-foreground/75" : "text-muted-foreground")}>张数</span>
                       <span className="font-data tabular-nums">{parsedCount}</span>
                       <ChevronDown
                         className={cn(
@@ -426,7 +755,7 @@ export function ImageComposer({
                     {isCountMenuOpen ? (
                       <div
                         ref={countMenuRef}
-                        className="fixed z-[80] rounded-2xl border border-stone-200/70 bg-white p-2 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
+                        className="fixed z-[80] rounded-2xl border border-border bg-card p-2 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
                         style={{
                           top: countMenuPos.top,
                           left: countMenuPos.left,
@@ -434,25 +763,25 @@ export function ImageComposer({
                           width: "min(212px, calc(100vw - 2rem))",
                         }}
                       >
-                        <div className="mb-1.5 px-1.5 pt-0.5 text-[11px] font-medium text-stone-400">生成数量</div>
+                        <div className="mb-1.5 px-1.5 pt-0.5 text-[11px] font-medium text-muted-foreground">生成数量</div>
                         <div className="grid grid-cols-4 gap-1.5">
-                          {COUNT_OPTIONS.map((value) => {
-                            const active = value === parsedCount;
-                            return (
-                              <button
-                                key={value}
-                                type="button"
-                                className={cn(
-                                  "flex h-9 cursor-pointer items-center justify-center rounded-lg font-data text-[13px] tabular-nums transition",
-                                  active
-                                    ? "bg-stone-900 font-semibold text-white"
-                                    : "bg-stone-50 text-stone-700 hover:bg-stone-100",
-                                )}
-                                onClick={() => {
-                                  onImageCountChange(String(value));
-                                  setIsCountMenuOpen(false);
-                                }}
-                              >
+                           {countOptions.map((value) => {
+                             const active = value === parsedCount;
+                             return (
+                               <button
+                                 key={value}
+                                 type="button"
+                                 className={cn(
+                                   "flex h-9 cursor-pointer items-center justify-center rounded-lg font-data text-[13px] tabular-nums transition",
+                                   active
+                                     ? "bg-primary font-semibold text-primary-foreground"
+                                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                                 )}
+                                 onClick={() => {
+                                   onImageCountChange(String(value));
+                                   setIsCountMenuOpen(false);
+                                 }}
+                               >
                                 {value}
                               </button>
                             );
@@ -468,10 +797,13 @@ export function ImageComposer({
                       className={cn(
                         "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition sm:h-10 sm:gap-2 sm:px-4 sm:text-[13px]",
                         isSizeMenuOpen
-                          ? "bg-stone-900 text-white"
-                          : "bg-stone-100 text-stone-700 hover:bg-stone-200",
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
                       )}
                       onClick={() => {
+                        setIsCountMenuOpen(false);
+                        setIsResolutionMenuOpen(false);
+                        setIsTemplateMenuOpen(false);
                         if (!isSizeMenuOpen && sizeMenuBtnRef.current) {
                           const rect = sizeMenuBtnRef.current.getBoundingClientRect();
                           const menuWidth = Math.min(232, window.innerWidth - 32);
@@ -483,12 +815,12 @@ export function ImageComposer({
                         setIsSizeMenuOpen((open) => !open);
                       }}
                     >
-                      <span className={cn("hidden sm:inline", isSizeMenuOpen ? "text-white/70" : "text-stone-500")}>比例</span>
+                      <span className={cn("hidden sm:inline", isSizeMenuOpen ? "text-primary-foreground/75" : "text-muted-foreground")}>比例</span>
                       {selectedSize.value ? (
                         <span
                           className={cn(
                             "inline-block shrink-0 rounded-[3px] border",
-                            isSizeMenuOpen ? "border-white/60 bg-white/20" : "border-stone-400 bg-stone-200",
+                            isSizeMenuOpen ? "border-primary-foreground/60 bg-primary-foreground/20" : "border-muted-foreground/60 bg-muted",
                           )}
                           style={{
                             width: `${selectedSize.w * 0.45}px`,
@@ -508,7 +840,7 @@ export function ImageComposer({
                     {isSizeMenuOpen ? (
                       <div
                         ref={sizeMenuRef}
-                        className="fixed z-[80] max-h-[55dvh] overflow-y-auto rounded-2xl border border-stone-200/70 bg-white p-1.5 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
+                        className="fixed z-[80] max-h-[55dvh] overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
                         style={{
                           top: sizeMenuPos.top,
                           left: sizeMenuPos.left,
@@ -516,7 +848,7 @@ export function ImageComposer({
                           width: "min(232px, calc(100vw - 2rem))",
                         }}
                       >
-                        <div className="mb-1 px-2 pt-1 text-[11px] font-medium text-stone-400">画面比例</div>
+                        <div className="mb-1 px-2 pt-1 text-[11px] font-medium text-muted-foreground">画面比例</div>
                         {SIZE_OPTIONS.map((option) => {
                           const active = option.value === imageSize;
                           return (
@@ -525,7 +857,7 @@ export function ImageComposer({
                               type="button"
                               className={cn(
                                 "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition",
-                                active ? "bg-stone-900 text-white" : "text-stone-700 hover:bg-stone-100",
+                                active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary",
                               )}
                               onClick={() => {
                                 onImageSizeChange(option.value);
@@ -535,14 +867,14 @@ export function ImageComposer({
                               <span
                                 className={cn(
                                   "flex size-8 shrink-0 items-center justify-center rounded-md",
-                                  active ? "bg-white/10" : "bg-stone-100",
+                                  active ? "bg-white/10" : "bg-secondary",
                                 )}
                               >
                                 {option.value ? (
                                   <span
                                     className={cn(
                                       "block rounded-[2px] border",
-                                      active ? "border-white/80" : "border-stone-400",
+                                      active ? "border-primary-foreground/80" : "border-muted-foreground/60",
                                     )}
                                     style={{
                                       width: `${option.w * 0.7}px`,
@@ -584,10 +916,13 @@ export function ImageComposer({
                       className={cn(
                         "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3 text-[12px] font-medium transition sm:h-10 sm:gap-2 sm:px-4 sm:text-[13px]",
                         isResolutionMenuOpen
-                          ? "bg-stone-900 text-white"
-                          : "bg-stone-100 text-stone-700 hover:bg-stone-200",
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
                       )}
                       onClick={() => {
+                        setIsCountMenuOpen(false);
+                        setIsSizeMenuOpen(false);
+                        setIsTemplateMenuOpen(false);
                         if (!isResolutionMenuOpen && resolutionMenuBtnRef.current) {
                           const rect = resolutionMenuBtnRef.current.getBoundingClientRect();
                           const menuWidth = Math.min(220, window.innerWidth - 32);
@@ -599,7 +934,7 @@ export function ImageComposer({
                         setIsResolutionMenuOpen((open) => !open);
                       }}
                     >
-                      <span className={cn("hidden sm:inline", isResolutionMenuOpen ? "text-white/70" : "text-stone-500")}>清晰度</span>
+                      <span className={cn("hidden sm:inline", isResolutionMenuOpen ? "text-primary-foreground/75" : "text-muted-foreground")}>清晰度</span>
                       <span className="font-data tabular-nums">{selectedResolution.label}</span>
                       <ChevronDown
                         className={cn(
@@ -611,7 +946,7 @@ export function ImageComposer({
                     {isResolutionMenuOpen ? (
                       <div
                         ref={resolutionMenuRef}
-                        className="fixed z-[80] max-h-[55dvh] overflow-y-auto rounded-2xl border border-stone-200/70 bg-white p-1.5 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
+                        className="fixed z-[80] max-h-[55dvh] overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
                         style={{
                           top: resolutionMenuPos.top,
                           left: resolutionMenuPos.left,
@@ -619,7 +954,7 @@ export function ImageComposer({
                           width: "min(220px, calc(100vw - 2rem))",
                         }}
                       >
-                        <div className="mb-1 px-2 pt-1 text-[11px] font-medium text-stone-400">目标清晰度</div>
+                        <div className="mb-1 px-2 pt-1 text-[11px] font-medium text-muted-foreground">目标清晰度</div>
                         {RESOLUTION_OPTIONS.map((option) => {
                           const active = option.value === imageResolution;
                           const disabled = isResolutionDisabled(option.value);
@@ -632,8 +967,8 @@ export function ImageComposer({
                                 "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition",
                                 disabled && "cursor-not-allowed opacity-40",
                                 !disabled && "cursor-pointer",
-                                active ? "bg-stone-900 text-white" : "text-stone-700",
-                                !active && !disabled && "hover:bg-stone-100",
+                                active ? "bg-primary text-primary-foreground" : "text-foreground",
+                                !active && !disabled && "hover:bg-secondary",
                               )}
                               onClick={() => {
                                 if (disabled) return;
@@ -644,7 +979,7 @@ export function ImageComposer({
                               <span
                                 className={cn(
                                   "font-data flex h-8 w-10 shrink-0 items-center justify-center rounded-md text-[12px] font-semibold tabular-nums",
-                                  active ? "bg-white/10 text-white" : "bg-stone-100 text-stone-700",
+                                  active ? "bg-white/10 text-white" : "bg-secondary text-foreground",
                                 )}
                               >
                                 {option.label}
@@ -654,7 +989,7 @@ export function ImageComposer({
                                 <span
                                   className={cn(
                                     "truncate text-[11px]",
-                                    active ? "text-white/70" : "text-stone-400",
+                                    active ? "text-primary-foreground/75" : "text-muted-foreground",
                                   )}
                                 >
                                   {option.desc}
@@ -670,18 +1005,32 @@ export function ImageComposer({
 
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => void onSubmit()}
-                  disabled={!prompt.trim()}
-                  className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-stone-900 text-white shadow-[0_1px_2px_rgba(15,23,42,0.1),0_4px_12px_-2px_rgba(15,23,42,0.2)] transition hover:bg-stone-800 hover:shadow-[0_1px_2px_rgba(15,23,42,0.1),0_8px_20px_-4px_rgba(15,23,42,0.3)] disabled:cursor-not-allowed disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none sm:size-10"
-                  aria-label={referenceImages.length > 0 ? "编辑图片" : "生成图片"}
-                >
-                  <ArrowUp className="size-3.5 sm:size-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {prompt.length > 0 && (
+                    <span className="mb-2 mr-1 text-[11px] tabular-nums text-muted-foreground select-none sm:mb-2.5 sm:mr-2">
+                      {prompt.length} / 1000
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void onSubmit()}
+                    disabled={!prompt.trim() || prompt.length > 1000}
+                    className="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_1px_2px_rgba(15,23,42,0.1),0_4px_12px_-2px_rgba(15,23,42,0.2)] transition hover:bg-primary/90 hover:shadow-[0_1px_2px_rgba(15,23,42,0.1),0_8px_20px_-4px_rgba(15,23,42,0.3)] disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none"
+                    aria-label={referenceImages.length > 0 ? "编辑图片" : "生成图片"}
+                  >
+                    <ArrowUp className="size-3.5 sm:size-4" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+        <div className="hidden sm:flex items-center justify-center gap-1.5 mt-2 text-[11px] text-muted-foreground/60 select-none">
+          <span>Enter 发送</span>
+          <span>·</span>
+          <span>Shift+Enter 换行</span>
+          <span>·</span>
+          <span>↑ 召回上次提示词</span>
         </div>
       </div>
     </div>

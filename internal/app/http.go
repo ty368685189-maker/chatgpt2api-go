@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -35,7 +36,7 @@ func uuid4() string {
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 func clean(s string) string    { return strings.TrimSpace(s) }
-func relClean(s string) string { return strings.TrimLeft(filepath.ToSlash(strings.TrimSpace(s)), "/") }
+func relClean(s string) string { return strings.TrimPrefix(path.Clean("/"+filepath.ToSlash(strings.TrimSpace(s))), "/") }
 func contains[T comparable](items []T, v T) bool {
 	for _, it := range items {
 		if it == v {

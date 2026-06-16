@@ -20,10 +20,10 @@ import { useSettingsStore } from "../store";
  *
  * 共享样式常量挑出来，避免几十处 className 重复。
  */
-const INPUT_CLASS = "h-10 rounded-xl border-stone-200 bg-white";
-const LABEL_CLASS = "text-sm text-stone-700";
-const HELP_CLASS = "text-xs text-stone-500";
-const TILE_CLASS = "rounded-xl border border-stone-200 bg-white px-4 py-3";
+const INPUT_CLASS = "h-10 rounded-xl border-border bg-background text-foreground";
+const LABEL_CLASS = "text-sm text-foreground/90";
+const HELP_CLASS = "text-xs text-muted-foreground";
+const TILE_CLASS = "rounded-xl border border-border bg-background text-foreground/90 px-4 py-3";
 
 /* ───────────────────────── 账号 ───────────────────────── */
 
@@ -45,14 +45,14 @@ export function AccountSection() {
         />
         <p className={HELP_CLASS}>控制账号自动刷新频率。</p>
       </div>
-      <label className={`flex items-center gap-3 ${TILE_CLASS} text-sm text-stone-700`}>
+      <label className={`flex items-center gap-3 ${TILE_CLASS} text-sm`}>
         <Checkbox
           checked={Boolean(config?.auto_remove_invalid_accounts)}
           onCheckedChange={(c) => setAutoRemoveInvalidAccounts(Boolean(c))}
         />
         自动移除异常账号
       </label>
-      <label className={`flex items-center gap-3 ${TILE_CLASS} text-sm text-stone-700`}>
+      <label className={`flex items-center gap-3 ${TILE_CLASS} text-sm`}>
         <Checkbox
           checked={Boolean(config?.auto_remove_rate_limited_accounts)}
           onCheckedChange={(c) => setAutoRemoveRateLimitedAccounts(Boolean(c))}
@@ -115,8 +115,8 @@ export function NetworkSection() {
         <div
           className={`rounded-xl border px-3 py-2 text-xs leading-6 ${
             proxyTestResult.ok
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : "border-rose-200 bg-rose-50 text-rose-800"
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "border-destructive/20 bg-destructive/10 text-destructive"
           }`}
         >
           {proxyTestResult.ok
@@ -128,7 +128,7 @@ export function NetworkSection() {
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-xl border-stone-200 bg-white px-4 text-stone-700"
+          className="h-9 rounded-xl border-border bg-background px-4 text-foreground/90"
           onClick={() => void handleTestProxy()}
           disabled={isTestingProxy}
         >
@@ -231,7 +231,7 @@ export function ImageSection() {
         </div>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-stone-200 bg-stone-50/60 p-4">
+      <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-4">
         <div className="space-y-2">
           <label className={LABEL_CLASS}>本地保留天数</label>
           <Input
@@ -244,26 +244,26 @@ export function ImageSection() {
             自动删除多少天前的本地图片。下面两项保护开关默认开启，避免清理把"还在用的图"也删掉造成画廊裂图或用户作品凭空消失。
           </p>
         </div>
-        <label className={`flex items-start gap-3 ${TILE_CLASS} text-sm text-stone-700`}>
+        <label className={`flex items-start gap-3 ${TILE_CLASS} text-sm`}>
           <Checkbox
             checked={Boolean(config?.cleanup_protect_gallery ?? true)}
             onCheckedChange={(c) => setCleanupProtectGallery(Boolean(c))}
           />
           <div className="space-y-1">
-            <div className="font-medium">保护画廊已发布的图片</div>
-            <div className="text-xs leading-5 text-stone-500">
+            <div className="font-medium text-foreground">保护画廊已发布的图片</div>
+            <div className="text-xs leading-5 text-muted-foreground">
               发布到画廊视为用户主动表示"这张图有保留价值"。关闭后画廊瓦片可能因 PNG 被删变成裂图。
             </div>
           </div>
         </label>
-        <label className={`flex items-start gap-3 ${TILE_CLASS} text-sm text-stone-700`}>
+        <label className={`flex items-start gap-3 ${TILE_CLASS} text-sm`}>
           <Checkbox
             checked={Boolean(config?.cleanup_protect_user_images ?? true)}
             onCheckedChange={(c) => setCleanupProtectUserImages(Boolean(c))}
           />
           <div className="space-y-1">
-            <div className="font-medium">保护用户「我的作品」</div>
-            <div className="text-xs leading-5 text-stone-500">
+            <div className="font-medium text-foreground">保护用户「我的作品」</div>
+            <div className="text-xs leading-5 text-muted-foreground">
               保留所有有归属密钥的图。匿名 / admin 自己生成的无归属图仍按 mtime 清理。关闭后所有过期图按一刀切删除。
             </div>
           </div>
@@ -288,7 +288,7 @@ export function SecuritySection() {
           value={String(config?.global_system_prompt || "")}
           onChange={(e) => setGlobalSystemPrompt(e.target.value)}
           placeholder="例如：先判断用户提示词是否合规；遇到违法、色情、暴力、仇恨等请求时拒绝回答。"
-          className="min-h-28 rounded-xl border-stone-200 bg-white font-mono text-xs shadow-none"
+          className="min-h-28 rounded-xl border-border bg-background text-foreground font-mono text-xs shadow-none"
         />
         <p className={HELP_CLASS}>
           每次请求都会作为 system 消息注入。可用于审核用户提示词、统一约束模型行为或固定角色设定。
@@ -300,7 +300,7 @@ export function SecuritySection() {
           value={(config?.sensitive_words || []).join("\n")}
           onChange={(e) => setSensitiveWordsText(e.target.value)}
           placeholder="一行一个，命中即拒绝"
-          className="min-h-28 rounded-xl border-stone-200 bg-white font-mono text-xs shadow-none"
+          className="min-h-28 rounded-xl border-border bg-background text-foreground font-mono text-xs shadow-none"
         />
         <p className={HELP_CLASS}>用户请求包含任意敏感词时直接返回拒绝，不再下发到生图账号。</p>
       </div>
@@ -316,14 +316,14 @@ export function AIReviewSection() {
 
   return (
     <div className="space-y-4">
-      <label className="flex items-center gap-3 text-sm text-stone-700">
+      <label className="flex items-center gap-3 text-sm text-foreground/90">
         <Checkbox
           checked={Boolean(config?.ai_review?.enabled)}
           onCheckedChange={(c) => setAIReviewField("enabled", Boolean(c))}
         />
         启用 AI 审核
       </label>
-      <p className="text-xs leading-6 text-stone-500">
+      <p className="text-xs leading-6 text-muted-foreground">
         开启后会在请求进入生图账号前先调用审核模型，审核不通过会直接拒绝，减少违规提示词触达账号造成风控或封号的风险。
       </p>
       <div className="grid gap-4 md:grid-cols-3">
@@ -361,7 +361,7 @@ export function AIReviewSection() {
           value={String(config?.ai_review?.prompt || "")}
           onChange={(e) => setAIReviewField("prompt", e.target.value)}
           placeholder="判断用户请求是否允许。只回答 ALLOW 或 REJECT。"
-          className="min-h-24 rounded-xl border-stone-200 bg-white text-xs shadow-none"
+          className="min-h-24 rounded-xl border-border bg-background text-foreground text-xs shadow-none"
         />
       </div>
     </div>
@@ -383,7 +383,7 @@ export function LogSection() {
         {logLevelOptions.map((level) => (
           <label
             key={level}
-            className={`flex items-center gap-2 ${TILE_CLASS} text-sm capitalize text-stone-700`}
+            className={`flex items-center gap-2 ${TILE_CLASS} text-sm capitalize`}
           >
             <Checkbox
               checked={Boolean(config?.log_levels?.includes(level))}
@@ -443,7 +443,7 @@ export function AnnouncementSection() {
           rows={6}
           value={ann.content ?? (ann.items || []).join("\n")}
           onChange={(e) => updateAnn({ content: e.target.value })}
-          className="rounded-xl border-stone-200 bg-white"
+          className="rounded-xl border-border bg-background text-foreground"
         />
       </div>
       <div className="grid gap-4 md:grid-cols-2">

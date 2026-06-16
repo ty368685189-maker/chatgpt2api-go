@@ -199,6 +199,10 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
    */
   const handleRedraw = (item: GalleryItem) => {
     if (typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (item.image_rel) params.set("redraw_rel", item.image_rel);
+    if (item.url) params.set("redraw_url", item.url);
+    if (item.prompt) params.set("redraw_prompt", item.prompt);
     try {
       window.sessionStorage.setItem(
         REDRAW_HANDOFF_KEY,
@@ -211,7 +215,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
     } catch {
       // 隐私模式 / 配额满时写不进去也不阻断跳转，画图页自己会兜底
     }
-    window.location.assign("/image");
+    window.location.assign(`/image/?${params.toString()}`);
   };
 
   const handleAdminToggleHide = async (item: GalleryItem) => {
@@ -309,7 +313,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
 
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin ? (
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-stone-200 bg-white/80 px-3 py-2 text-sm text-stone-700 hover:bg-white">
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-card/80 px-3 py-2 text-sm text-foreground hover:bg-secondary hover:text-foreground">
               <Checkbox
                 checked={includeHidden}
                 onCheckedChange={(v) => setIncludeHidden(Boolean(v))}
@@ -319,7 +323,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
           ) : null}
           <Button
             variant="outline"
-            className="h-10 rounded-xl border-stone-200 bg-white/80 px-4 text-stone-700 hover:bg-white"
+            className="h-10 rounded-xl border-border bg-card/80 px-4 text-foreground hover:bg-secondary hover:text-foreground"
             onClick={() => void loadFirstPage()}
             disabled={isLoading}
           >
@@ -330,25 +334,25 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
       </section>
 
       {isLoading && items.length === 0 ? (
-        <Card className="mt-6 rounded-2xl border-white/80 bg-white/90 shadow-sm">
+        <Card className="mt-6 rounded-2xl border-border bg-card shadow-sm">
           <CardContent className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-            <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
+            <div className="rounded-xl bg-secondary p-3 text-muted-foreground">
               <LoaderCircle className="size-5 animate-spin" />
             </div>
-            <p className="text-sm text-stone-500">从画廊同步作品…</p>
+            <p className="text-sm text-muted-foreground">从画廊同步作品…</p>
           </CardContent>
         </Card>
       ) : null}
 
       {!isLoading && items.length === 0 ? (
-        <Card className="mt-6 rounded-2xl border-white/80 bg-white/90 shadow-sm">
+        <Card className="mt-6 rounded-2xl border-border bg-card shadow-sm">
           <CardContent className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-            <div className="rounded-xl bg-stone-100 p-3 text-stone-500">
+            <div className="rounded-xl bg-secondary p-3 text-muted-foreground">
               <ImageIcon className="size-5" />
             </div>
             <div className="space-y-1">
-              <p className="text-sm font-medium text-stone-700">画廊还很空</p>
-              <p className="text-sm text-stone-500">
+              <p className="text-sm font-medium text-foreground">画廊还很空</p>
+              <p className="text-sm text-muted-foreground">
                 到「我的作品」打开任意作品，点「发布到画廊」即可分享
               </p>
             </div>
@@ -375,7 +379,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                   type="button"
                   onClick={() => setFocused(item)}
                   className={cn(
-                    "group relative w-full cursor-pointer overflow-hidden rounded-2xl border border-stone-200/80 bg-stone-100 text-left shadow-sm transition hover:shadow-md",
+                    "group relative w-full cursor-pointer overflow-hidden rounded-2xl border border-border/80 bg-secondary text-left shadow-sm transition hover:shadow-md",
                     isHidden && "opacity-60 hover:opacity-90",
                   )}
                   style={{ aspectRatio: String(ratio) }}
@@ -413,7 +417,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {/* 滚到底触发器 */}
-      <div ref={sentinelRef} className="mt-6 flex h-10 items-center justify-center text-xs text-stone-400">
+      <div ref={sentinelRef} className="mt-6 flex h-10 items-center justify-center text-xs text-muted-foreground">
         {isLoadingMore ? (
           <span className="inline-flex items-center gap-2">
             <LoaderCircle className="size-3 animate-spin" />
@@ -440,14 +444,14 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                   - 实际图片用 object-contain 居中，max-h 限到 65vh 让弹窗一屏装得下
                   竖图两侧的"留白"变成原图的模糊延伸光，不再是突兀的纯黑/纯灰。 */}
               <div
-                className="relative overflow-hidden bg-stone-200"
+                className="relative overflow-hidden bg-secondary"
                 style={{
                   backgroundImage: `url(${focusedView.url})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
                 }}
               >
-                <div className="absolute inset-0 bg-stone-950/35 backdrop-blur-2xl" />
+                <div className="absolute inset-0 bg-background/40 backdrop-blur-2xl" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={focusedView.url}
@@ -467,18 +471,18 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                     告诉看图的人这段提示词无法独立复用，免得复制了一段抽象指令
                     回去发现完全跑偏。复制按钮也会跟着 disabled。 */}
                 {focusedView.is_edit ? (
-                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-[12.5px] leading-6 text-amber-900">
-                    <Wand2 className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[12.5px] leading-6 text-amber-600 dark:text-amber-400">
+                    <Wand2 className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
                     <span>
                       这是图生图作品，提示词依赖原始参考图，无法独立复用。点击「用此图二创」可以把这张图当参考图继续创作。
                     </span>
                   </div>
                 ) : (
-                  <div className="rounded-xl bg-stone-50 p-3 text-[13px] leading-6 text-stone-800">
+                  <div className="rounded-xl bg-secondary/50 p-3 text-[13px] leading-6 text-foreground">
                     {focusedView.prompt || "—"}
                   </div>
                 )}
-                <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   {focusedView.model ? (
                     <Badge variant="secondary" className="rounded-md font-medium">
                       {focusedView.model}
@@ -503,21 +507,21 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                   <Button
                     onClick={() => void handleCopyPrompt(focusedView.prompt)}
                     disabled={focusedView.is_edit || !focusedView.prompt?.trim()}
-                    className="h-10 w-full rounded-xl bg-stone-950 px-2 text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:hover:bg-stone-300"
+                    className="h-10 w-full rounded-xl bg-primary px-2 text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground disabled:hover:bg-muted"
                   >
                     <Copy className="size-4" />
                     复制 prompt
                   </Button>
                   <Button
                     onClick={() => handleRedraw(focusedView)}
-                    className="h-10 w-full rounded-xl bg-stone-950 px-2 text-white hover:bg-stone-800"
+                    className="h-10 w-full rounded-xl bg-primary px-2 text-primary-foreground hover:bg-primary/90"
                   >
                     <Wand2 className="size-4" />
                     用此图二创
                   </Button>
                   <Button
                     variant="outline"
-                    className="h-10 w-full rounded-xl border-stone-200 bg-white px-2"
+                    className="h-10 w-full rounded-xl border-border bg-card px-2 text-foreground hover:bg-secondary"
                     onClick={() => window.open(focusedView.url, "_blank", "noopener,noreferrer")}
                   >
                     <ExternalLink className="size-4" />
@@ -540,7 +544,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                       {showSelfUnpublish ? (
                         <Button
                           variant="outline"
-                          className="h-10 w-full rounded-xl border-rose-200 bg-white px-2 text-rose-600 hover:bg-rose-50"
+                          className="h-10 w-full rounded-xl border-rose-200/50 bg-card px-2 text-rose-500 hover:bg-rose-500/10"
                           onClick={() => void handleSelfUnpublish(focusedView)}
                         >
                           <Trash2 className="size-4" />
@@ -550,7 +554,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
                       {showAdminHide ? (
                         <Button
                           variant="outline"
-                          className="h-10 w-full rounded-xl border-stone-200 bg-white px-2"
+                          className="h-10 w-full rounded-xl border-border bg-card px-2 text-foreground hover:bg-secondary"
                           onClick={() => void handleAdminToggleHide(focusedView)}
                         >
                           <EyeOff className="size-4" />
@@ -602,7 +606,7 @@ function GalleryPageContent({ isAdmin }: { isAdmin: boolean }) {
       </Dialog>
 
       {/* 发布入口提示 */}
-      <div className="mt-12 flex items-center justify-center gap-2 text-xs text-stone-400">
+      <div className="mt-12 flex items-center justify-center gap-2 text-xs text-muted-foreground">
         <Sparkles className="size-3" />
         <span>发布入口：「我的作品」页打开任意作品 → 发布到画廊</span>
       </div>
@@ -616,7 +620,7 @@ export default function GalleryPage() {
   if (isCheckingAuth || !session) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
-        <LoaderCircle className="size-5 animate-spin text-stone-400" />
+        <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
       </div>
     );
   }

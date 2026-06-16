@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { X, LoaderCircle, RefreshCw } from "lucide-react";
 import { fetchSystemAnnouncement, fetchSystemPoolStatus, type AnnouncementConfig, type SystemPoolStatus } from "@/lib/api";
 import { usePathname } from "next/navigation";
+import { getValidatedAuthSession } from "@/lib/auth-session";
+import { type StoredAuthSession } from "@/store/auth";
 
 const STORAGE_KEY_VERSION = "announcement_dismissed_version";
 const STORAGE_KEY_TODAY = "announcement_dismissed_today";
@@ -53,23 +55,23 @@ function PoolStatusWidget() {
   else if (total_1h > 0 && successRatio < 0.8) indicatorColor = "bg-orange-500";
 
   return (
-    <div className="flex items-center justify-between bg-stone-50 rounded-xl p-3 border border-stone-100 group">
+    <div className="flex items-center justify-between bg-muted/50 rounded-xl p-3 border border-border group">
       <div className="flex items-center gap-2">
         <div className="relative flex h-3 w-3">
           <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${indicatorColor}`}></span>
           <span className={`relative inline-flex rounded-full h-3 w-3 ${indicatorColor}`}></span>
         </div>
-        <span className="text-[13px] font-medium text-stone-700">生图成功率 (一小时内)</span>
+        <span className="text-[13px] font-medium text-foreground/90">生图成功率 (一小时内)</span>
       </div>
-      <div className="text-[12px] text-stone-500 flex items-center gap-3">
-        <span>调用: <span className="text-stone-700 font-semibold">{total_1h}</span></span>
-        <span>成功: <span className="text-stone-700 font-semibold">{success_1h}</span></span>
-        <span>成功率: <span className="text-stone-700 font-semibold">{percentage}%</span></span>
-        <span>耗时: <span className="text-stone-700 font-semibold">{avg_latency_ms >= 1000 ? `${(avg_latency_ms / 1000).toFixed(1)}s` : `${avg_latency_ms}ms`}</span></span>
+      <div className="text-[12px] text-muted-foreground flex items-center gap-3">
+        <span>调用: <span className="text-foreground font-semibold">{total_1h}</span></span>
+        <span>成功: <span className="text-foreground font-semibold">{success_1h}</span></span>
+        <span>成功率: <span className="text-foreground font-semibold">{percentage}%</span></span>
+        <span>耗时: <span className="text-foreground font-semibold">{avg_latency_ms >= 1000 ? `${(avg_latency_ms / 1000).toFixed(1)}s` : `${avg_latency_ms}ms`}</span></span>
         <button
           onClick={loadStatus}
           disabled={refreshing}
-          className="p-1 rounded-md hover:bg-stone-200 text-stone-400 hover:text-stone-700 transition-colors disabled:opacity-50"
+          className="p-1 rounded-md hover:bg-muted text-muted-foreground/80 hover:text-foreground transition-colors disabled:opacity-50"
           title="刷新数据"
         >
           <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin" : ""}`} />
@@ -81,6 +83,7 @@ function PoolStatusWidget() {
 
 /** 公告内容（弹窗和详情页共用） */
 export function AnnouncementContent({ ann }: { ann: AnnouncementConfig }) {
+  const [isZoomed, setIsZoomed] = useState(false);
   if (!ann) return null;
 
   return (
@@ -90,13 +93,13 @@ export function AnnouncementContent({ ann }: { ann: AnnouncementConfig }) {
       
       {/* 公告内容 */}
       {ann.content ? (
-        <p className="text-[14px] leading-relaxed text-stone-600 whitespace-pre-line">
+        <p className="text-[14px] leading-relaxed text-foreground/80 whitespace-pre-line">
           {ann.content}
         </p>
       ) : (
         <div className="space-y-2.5">
           {ann.items?.map((item, i) => (
-            <p key={i} className="text-[14px] leading-relaxed text-stone-600 whitespace-pre-line">
+            <p key={i} className="text-[14px] leading-relaxed text-foreground/80 whitespace-pre-line">
               {item}
             </p>
           ))}
@@ -105,34 +108,52 @@ export function AnnouncementContent({ ann }: { ann: AnnouncementConfig }) {
 
       {/* QQ 群 */}
       {ann.qq_group?.number && (
-        <div className="pt-3 border-t border-stone-100">
-          <p className="text-[13px] text-stone-400 mb-3 text-center">
-            QQ 群号：<span className="font-semibold text-stone-700">{ann.qq_group.number}</span>　扫码加入
+        <div className="pt-3 border-t border-border/50">
+          <p className="text-[13px] text-muted-foreground mb-3 text-center">
+            QQ 群号：<span className="font-semibold text-foreground">{ann.qq_group.number}</span>　扫码加入
           </p>
           {ann.qq_group.image && (
-            <a 
-              href={ann.qq_group.image} 
-              target="_blank" 
-              rel="noreferrer"
-              className="block mx-auto w-[160px] h-[160px] rounded-xl overflow-hidden bg-stone-50 hover:opacity-90 transition-opacity cursor-zoom-in"
-              title="点击查看大图"
-            >
-              <img src={ann.qq_group.image} alt="QQ群二维码" className="w-full h-full object-contain" />
-            </a>
+            <>
+              <button 
+                onClick={() => setIsZoomed(true)}
+                className="block mx-auto w-[160px] h-[160px] rounded-xl overflow-hidden bg-muted/30 border border-border hover:opacity-90 transition-opacity cursor-zoom-in"
+                title="点击查看大图"
+              >
+                <img 
+                  src={`${ann.qq_group.image}?v=${ann.version || 1}`} 
+                  alt="QQ群二维码" 
+                  className="w-full h-full object-contain" 
+                />
+              </button>
+              {isZoomed && (
+                <div 
+                  className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm cursor-zoom-out"
+                  onClick={() => setIsZoomed(false)}
+                >
+                  <div className="relative max-w-[90vw] max-h-[90vh]">
+                    <img 
+                      src={`${ann.qq_group.image}?v=${ann.version || 1}`} 
+                      alt="QQ群二维码放大" 
+                      className="max-w-[320px] max-h-[320px] rounded-2xl shadow-2xl border-2 border-white/10" 
+                    />
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
 
       {/* 致谢 */}
       {ann.github?.url && (
-        <div className="pt-3 border-t border-stone-100 text-center">
-          <p className="text-[12px] text-stone-400">
+        <div className="pt-3 border-t border-border/50 text-center">
+          <p className="text-[12px] text-muted-foreground">
             基于开源项目{" "}
             <a
               href={ann.github.url}
               target="_blank"
               rel="noreferrer"
-              className="text-stone-600 underline underline-offset-2 hover:text-stone-900 transition-colors"
+              className="text-foreground/80 underline underline-offset-2 hover:text-foreground transition-colors"
             >
               ChatGPT2API
             </a>{" "}
@@ -141,7 +162,7 @@ export function AnnouncementContent({ ann }: { ann: AnnouncementConfig }) {
               href={ann.github.url}
               target="_blank"
               rel="noreferrer"
-              className="font-semibold text-stone-700 hover:text-stone-900 transition-colors"
+              className="font-semibold text-foreground hover:text-foreground transition-colors"
             >
               {ann.github.author}
             </a>
@@ -156,13 +177,33 @@ export function AnnouncementContent({ ann }: { ann: AnnouncementConfig }) {
 export function AnnouncementModal() {
   const [open, setOpen] = useState(false);
   const { ann, loading } = useAnnouncement();
+  const [session, setSession] = useState<StoredAuthSession | null>(null);
 
   const pathname = usePathname();
+
+  useEffect(() => {
+    if (pathname === "/login" || pathname === "/register" || pathname === "/") {
+      setSession(null);
+      return;
+    }
+
+    let active = true;
+    getValidatedAuthSession().then((storedSession) => {
+      if (active) {
+        setSession(storedSession);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     if (loading || !ann) return;
     if (typeof window === "undefined") return;
     if (pathname === "/login" || pathname === "/register" || pathname === "/") return;
+    if (!session) return; // 登录后才弹出来
 
     // 永久关闭：版本号一致就不弹
     const dismissedVersion = localStorage.getItem(STORAGE_KEY_VERSION);
@@ -174,7 +215,7 @@ export function AnnouncementModal() {
 
     const timer = setTimeout(() => setOpen(true), 300);
     return () => clearTimeout(timer);
-  }, [ann, loading, pathname]);
+  }, [ann, loading, pathname, session]);
 
   if (!open || !ann) return null;
 
@@ -194,18 +235,18 @@ export function AnnouncementModal() {
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleCloseToday} />
 
       {/* 弹窗 */}
-      <div className="relative w-full max-w-[420px] max-h-[85vh] overflow-y-auto rounded-[24px] bg-white shadow-[0_32px_100px_rgba(0,0,0,0.15)]">
+      <div className="relative w-full max-w-[420px] max-h-[85vh] overflow-y-auto rounded-[24px] bg-card border border-border shadow-[0_32px_100px_rgba(0,0,0,0.15)]">
         {/* 关闭按钮 */}
         <button
           onClick={handleCloseToday}
-          className="absolute top-4 right-4 p-1.5 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+          className="absolute top-4 right-4 p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
         >
           <X className="size-4" />
         </button>
 
         <div className="p-6 sm:p-8 space-y-5">
           {/* 标题 */}
-          <h2 className="text-xl font-semibold text-stone-950">{ann.title || "公告"}</h2>
+          <h2 className="text-xl font-semibold text-foreground">{ann.title || "公告"}</h2>
 
           {/* 内容 */}
           <AnnouncementContent ann={ann} />
@@ -214,13 +255,13 @@ export function AnnouncementModal() {
           <div className="flex gap-3 pt-2">
             <button
               onClick={handleCloseToday}
-              className="flex-1 h-11 rounded-xl border border-stone-200 text-[13px] font-medium text-stone-500 hover:bg-stone-50 hover:text-stone-700 transition-colors cursor-pointer"
+              className="flex-1 h-11 rounded-xl border border-border text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
             >
               今日关闭
             </button>
             <button
               onClick={handleCloseForever}
-              className="flex-1 h-11 rounded-xl bg-stone-950 text-[13px] font-medium text-white hover:bg-stone-800 transition-colors cursor-pointer"
+              className="flex-1 h-11 rounded-xl bg-primary text-[13px] font-medium text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
             >
               我知道了
             </button>

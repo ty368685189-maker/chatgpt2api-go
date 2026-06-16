@@ -15,9 +15,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -77,7 +79,20 @@ func (s *Server) recordPrompt(rel, prompt string, isEdit bool) {
 	ps[rel] = map[string]any{"prompt": prompt, "is_edit": isEdit, "created_at": time.Now().Unix()}
 	_ = s.store.SavePrompts(ps)
 }
+var (
+	lastCleanupTime time.Time
+	cleanupMutex    sync.Mutex
+)
+
 func (s *Server) cleanupOldImages() int {
+	cleanupMutex.Lock()
+	if time.Since(lastCleanupTime) < 1*time.Hour {
+		cleanupMutex.Unlock()
+		return 0
+	}
+	lastCleanupTime = time.Now()
+	cleanupMutex.Unlock()
+
 	days := s.cfg.ImageRetentionDays
 	if days <= 0 {
 		days = 30
@@ -114,13 +129,17 @@ func (s *Server) cleanupOldImages() int {
 		}
 		if os.Remove(path) == nil {
 			removed++
+			if err == nil {
+				_ = os.Remove(s.thumbnailPath(filepath.ToSlash(rel)))
+			}
 		}
 		return nil
 	})
 	// 清理空目录，深目录优先
 	dirs := []string{}
+	cleanImagesDir := filepath.Clean(s.imagesDir)
 	_ = filepath.WalkDir(s.imagesDir, func(path string, d os.DirEntry, err error) error {
-		if err == nil && d.IsDir() && path != s.imagesDir {
+		if err == nil && d.IsDir() && filepath.Clean(path) != cleanImagesDir {
 			dirs = append(dirs, path)
 		}
 		return nil
@@ -129,8 +148,62 @@ func (s *Server) cleanupOldImages() int {
 	for _, d := range dirs {
 		_ = os.Remove(d)
 	}
-	if removed > 0 && s.logSvc != nil {
-		s.logSvc.add("system", "清理旧图片", map[string]any{"removed": removed, "retention_days": days})
+
+	// 清理缩略图空目录，深目录优先
+	thumbDir := filepath.Join(s.dataDir, "image_thumbnails")
+	thumbDirs := []string{}
+	cleanThumbDir := filepath.Clean(thumbDir)
+	_ = filepath.WalkDir(thumbDir, func(path string, d os.DirEntry, err error) error {
+		if err == nil && d.IsDir() && filepath.Clean(path) != cleanThumbDir {
+			thumbDirs = append(thumbDirs, path)
+		}
+		return nil
+	})
+	sort.Slice(thumbDirs, func(i, j int) bool { return len(thumbDirs[i]) > len(thumbDirs[j]) })
+	for _, d := range thumbDirs {
+		_ = os.Remove(d)
+	}
+
+	if removed > 0 {
+		owners := s.store.LoadOwners()
+		prompts := s.store.LoadPrompts()
+		tags := s.store.LoadTags()
+		changedOwners := false
+		changedPrompts := false
+		changedTags := false
+
+		for rel := range owners {
+			if _, err := os.Stat(filepath.Join(s.imagesDir, filepath.FromSlash(rel))); os.IsNotExist(err) {
+				delete(owners, rel)
+				changedOwners = true
+			}
+		}
+		for rel := range prompts {
+			if _, err := os.Stat(filepath.Join(s.imagesDir, filepath.FromSlash(rel))); os.IsNotExist(err) {
+				delete(prompts, rel)
+				changedPrompts = true
+			}
+		}
+		for rel := range tags {
+			if _, err := os.Stat(filepath.Join(s.imagesDir, filepath.FromSlash(rel))); os.IsNotExist(err) {
+				delete(tags, rel)
+				changedTags = true
+			}
+		}
+
+		if changedOwners {
+			_ = s.store.SaveOwners(owners)
+		}
+		if changedPrompts {
+			_ = s.store.SavePrompts(prompts)
+		}
+		if changedTags {
+			_ = s.store.SaveTags(tags)
+		}
+
+		if s.logSvc != nil {
+			s.logSvc.add("system", "清理旧图片及失效元数据", map[string]any{"removed": removed, "retention_days": days})
+		}
 	}
 	return removed
 }
@@ -220,6 +293,8 @@ func (s *Server) handleImageDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owners := s.store.LoadOwners()
+	prompts := s.store.LoadPrompts()
+	tags := s.store.LoadTags()
 	removed := 0
 	for _, p := range b.Paths {
 		rel := relClean(p)
@@ -229,23 +304,40 @@ func (s *Server) handleImageDelete(w http.ResponseWriter, r *http.Request) {
 		if os.Remove(filepath.Join(s.imagesDir, filepath.FromSlash(rel))) == nil {
 			removed++
 			delete(owners, rel)
+			delete(prompts, rel)
+			delete(tags, rel)
+			_ = os.Remove(s.thumbnailPath(rel))
 		}
 	}
 	_ = s.store.SaveOwners(owners)
+	_ = s.store.SavePrompts(prompts)
+	_ = s.store.SaveTags(tags)
 	writeJSON(w, 200, map[string]any{"removed": removed})
 }
+func unescapeAndCleanPath(p string) string {
+	if decoded, err := url.PathUnescape(p); err == nil {
+		p = decoded
+	}
+	p = path.Clean("/" + p)
+	return strings.TrimPrefix(p, "/")
+}
 func (s *Server) handleImageDownload(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
+	id, ok := s.requireIdentity(w, r)
+	if !ok {
 		return
 	}
 	var b struct {
 		Paths []string `json:"paths"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&b)
+	owners := s.store.LoadOwners()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
 	for _, p := range b.Paths {
-		rel := relClean(p)
+		rel := unescapeAndCleanPath(p)
+		if id.Role != "admin" && owners[rel] != id.ID {
+			continue
+		}
 		data, err := os.ReadFile(filepath.Join(s.imagesDir, filepath.FromSlash(rel)))
 		if err == nil {
 			f, _ := zw.Create(filepath.Base(rel))
@@ -258,12 +350,17 @@ func (s *Server) handleImageDownload(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(buf.Bytes())
 }
 func (s *Server) handleImageDownloadSingle(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
+	id, ok := s.requireIdentity(w, r)
+	if !ok {
 		return
 	}
 	rel := strings.TrimPrefix(r.URL.Path, "/api/images/download/")
-	rel = filepath.Clean("/" + rel)
-	rel = strings.TrimPrefix(rel, "/")
+	rel = unescapeAndCleanPath(rel)
+	owners := s.store.LoadOwners()
+	if id.Role != "admin" && owners[rel] != id.ID {
+		writeErr(w, 403, "需要权限")
+		return
+	}
 	http.ServeFile(w, r, filepath.Join(s.imagesDir, filepath.FromSlash(rel)))
 }
 func (s *Server) handleThumbnail(w http.ResponseWriter, r *http.Request) {

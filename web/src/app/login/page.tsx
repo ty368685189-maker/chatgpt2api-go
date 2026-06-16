@@ -76,32 +76,32 @@ export default function LoginPage() {
   if (isCheckingAuth) {
     return (
       <div className="grid min-h-[calc(100vh-1rem)] w-full place-items-center px-4 py-6">
-        <LoaderCircle className="size-5 animate-spin text-stone-400" />
+        <LoaderCircle className="size-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
     <div className="grid min-h-[calc(100vh-1rem)] w-full place-items-center px-4 py-6">
-      <Card className="w-full max-w-[400px] rounded-[30px] border-white/80 bg-white/95 shadow-[0_28px_90px_rgba(28,25,23,0.10)]">
+      <Card className="w-full max-w-[400px] rounded-[30px] border-border bg-card shadow-[0_28px_90px_rgba(0,0,0,0.2)]">
         <CardContent className="space-y-6 p-6 sm:p-8">
           <div className="space-y-4 text-center">
-            <div className="mx-auto inline-flex size-14 items-center justify-center rounded-[18px] bg-stone-950 text-white shadow-sm">
+            <div className="mx-auto inline-flex size-14 items-center justify-center rounded-[18px] bg-primary text-primary-foreground shadow-sm">
               <LockKeyhole className="size-5" />
             </div>
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight text-stone-950">欢迎回来</h1>
-              <p className="text-sm leading-6 text-stone-500">
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground">欢迎回来</h1>
+              <p className="text-sm leading-6 text-muted-foreground">
                 {mode === "password" ? "输入账号密码继续使用。" : "输入密钥后继续使用。"}
               </p>
             </div>
           </div>
 
           {/* 模式切换 */}
-          <div className="flex rounded-xl bg-stone-100 p-1 text-[13px] font-medium">
+          <div className="flex rounded-xl bg-secondary p-1 text-[13px] font-medium">
             <button
               className={`flex-1 rounded-lg py-1.5 transition-colors cursor-pointer ${
-                mode === "password" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500"
+                mode === "password" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
               }`}
               onClick={() => setMode("password")}
             >
@@ -109,7 +109,7 @@ export default function LoginPage() {
             </button>
             <button
               className={`flex-1 rounded-lg py-1.5 transition-colors cursor-pointer ${
-                mode === "key" ? "bg-white text-stone-900 shadow-sm" : "text-stone-500"
+                mode === "key" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
               }`}
               onClick={() => setMode("key")}
             >
@@ -121,16 +121,16 @@ export default function LoginPage() {
             {mode === "password" ? (
               <>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-stone-700">用户名</label>
+                  <label className="block text-sm font-medium text-muted-foreground">用户名</label>
                   <Input
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="请输入用户名"
-                    className="h-12 rounded-2xl border-stone-200 bg-white px-4"
+                    className="h-12 rounded-2xl border-border bg-background px-4"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium text-stone-700">密码</label>
+                  <label className="block text-sm font-medium text-muted-foreground">密码</label>
                   <Input
                     type="password"
                     value={password}
@@ -139,13 +139,13 @@ export default function LoginPage() {
                       if (e.key === "Enter") void handlePasswordLogin();
                     }}
                     placeholder="请输入密码"
-                    className="h-12 rounded-2xl border-stone-200 bg-white px-4"
+                    className="h-12 rounded-2xl border-border bg-background px-4"
                   />
                 </div>
               </>
             ) : (
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-stone-700">密钥</label>
+                <label className="block text-sm font-medium text-muted-foreground">密钥</label>
                 <Input
                   type="password"
                   value={authKey}
@@ -154,14 +154,14 @@ export default function LoginPage() {
                     if (e.key === "Enter") void handleKeyLogin();
                   }}
                   placeholder="请输入密钥"
-                  className="h-12 rounded-2xl border-stone-200 bg-white px-4"
+                  className="h-12 rounded-2xl border-border bg-background px-4"
                 />
               </div>
             )}
           </div>
 
           <Button
-            className="h-12 w-full rounded-2xl bg-stone-950 text-white hover:bg-stone-800"
+            className="h-12 w-full rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => (mode === "password" ? void handlePasswordLogin() : void handleKeyLogin())}
             disabled={isSubmitting}
           >
@@ -170,7 +170,7 @@ export default function LoginPage() {
           </Button>
 
           <div className="text-center text-sm">
-            <Link href="/register" className="text-stone-500 hover:text-stone-900 transition-colors">
+            <Link href="/register" className="text-muted-foreground hover:text-foreground transition-colors">
               没有账号？点击注册
             </Link>
           </div>
