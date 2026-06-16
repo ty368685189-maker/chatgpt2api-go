@@ -255,24 +255,35 @@ export async function listImageConversations(): Promise<ImageConversation[]> {
     const serverData = await listImageConversationsServer();
     const serverItems = (serverData.items || []).map((item) => normalizeConversation(item as ImageConversation & Record<string, unknown>));
     
-    if (serverItems.length > 0) {
-      // Merge: server items + local items, deduplicate by id, pick latest
-      const merged = new Map<string, ImageConversation>();
-      for (const item of localItems) {
-        merged.set(item.id, item);
-      }
-      for (const item of serverItems) {
-        const existing = merged.get(item.id);
-        merged.set(item.id, existing ? pickLatestConversation(existing, item) : item);
-      }
-      const result = sortImageConversations([...merged.values()]);
-      
-      // Save merged result back to local (without b64 to save space)
-      const stripped = result.map(stripB64ForStorage);
-      await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, stripped);
-      
-      return result;
+    // Merge: server items + local items, deduplicate by id, pick latest
+    const merged = new Map<string, ImageConversation>();
+    for (const item of localItems) {
+      merged.set(item.id, item);
     }
+    for (const item of serverItems) {
+      const existing = merged.get(item.id);
+      merged.set(item.id, existing ? pickLatestConversation(existing, item) : item);
+    }
+    const result = sortImageConversations([...merged.values()]);
+    
+    // If server has fewer items, sync local ones up
+    if (localItems.length > 0 && serverItems.length < localItems.length) {
+      const serverIds = new Set(serverItems.map(i => i.id));
+      const toSync = localItems.filter(i => !serverIds.has(i.id));
+      for (const conv of toSync) {
+        try {
+          await saveImageConversationServer(stripB64ForServer(conv));
+        } catch {
+          // Ignore
+        }
+      }
+    }
+    
+    // Save merged result back to local
+    const stripped = result.map(stripB64ForStorage);
+    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, stripped);
+    
+    return result;
   } catch {
     // Server unavailable, fall back to local only
   }
@@ -324,7 +335,7 @@ export async function saveImageConversations(conversations: ImageConversation[])
       conversationMap.set(conversation.id, current ? pickLatestConversation(current, conversation) : conversation);
     }
     const sorted = sortImageConversations([...conversationMap.values()]);
-    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, stripB64ForStorage(sorted));
+    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, sorted.map(stripB64ForStorage));
     
     // Sync to server (fire and forget)
     for (const conversation of conversations) {
@@ -347,7 +358,7 @@ export async function saveImageConversation(conversation: ImageConversation): Pr
       persistedConversation,
       ...items.filter((item) => item.id !== persistedConversation.id),
     ]);
-    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, stripB64ForStorage(nextItems));
+    await imageConversationStorage.setItem(IMAGE_CONVERSATIONS_KEY, nextItems.map(stripB64ForStorage));
     
     // Sync to server (fire and forget)
     try {
