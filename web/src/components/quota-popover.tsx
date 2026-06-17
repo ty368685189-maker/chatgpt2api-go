@@ -97,7 +97,12 @@ function buildRows(identity: AuthIdentity): QuotaRow[] {
   ];
 }
 
-export function QuotaPopover() {
+interface QuotaPopoverProps {
+  displayName: string;
+  roleLabel: string;
+}
+
+export function QuotaPopover({ displayName, roleLabel }: QuotaPopoverProps) {
   const [open, setOpen] = useState(false);
   const [identity, setIdentity] = useState<AuthIdentity | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -131,10 +136,22 @@ export function QuotaPopover() {
         <button
           type="button"
           aria-label="查看额度使用情况"
-          title="查看额度"
-          className="grid size-6 cursor-pointer place-items-center rounded-md border border-transparent text-muted-foreground transition hover:border-border/70 hover:bg-card hover:text-foreground"
+          title="查看额度使用情况"
+          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-[11px] leading-none transition hover:bg-secondary hover:text-foreground active:scale-[0.98] select-none"
         >
-          <Gauge className="size-3.5" />
+          <span className="grid size-4 place-items-center rounded-[4px] bg-foreground text-[8.5px] font-bold text-background shrink-0">
+            {(displayName[0] || roleLabel[0] || "U").toUpperCase()}
+          </span>
+          <span className="font-data font-bold text-foreground truncate max-w-[80px] sm:max-w-[120px]">
+            {displayName}
+          </span>
+          {displayName !== roleLabel && (
+            <>
+              <span className="text-muted-foreground/75 hidden sm:inline">·</span>
+              <span className="font-bold text-muted-foreground hidden sm:inline">{roleLabel}</span>
+            </>
+          )}
+          <Gauge className="size-3.5 text-muted-foreground shrink-0 ml-0.5" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-[320px] p-0">
