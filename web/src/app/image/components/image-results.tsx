@@ -286,7 +286,7 @@ function LoadingCard({
         <button
           type="button"
           onClick={onCancel}
-          className="absolute right-2 bottom-2 hidden group-hover:inline-flex h-6 items-center gap-1 rounded-full bg-rose-50 px-2 text-[10px] font-semibold text-rose-600 ring-1 ring-rose-200/80 transition hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:ring-rose-900/50 z-10"
+          className="absolute right-2 bottom-2 inline-flex h-6 items-center gap-1 rounded-full bg-rose-50 px-2 text-[10px] font-semibold text-rose-600 ring-1 ring-rose-200/80 transition hover:bg-rose-100 dark:bg-rose-950/30 dark:text-rose-400 dark:ring-rose-900/50 z-10"
           title="取消此生图任务"
           aria-label="取消任务"
         >
