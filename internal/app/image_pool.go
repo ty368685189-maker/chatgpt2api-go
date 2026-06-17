@@ -4,10 +4,39 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 )
 
+// 全局生图冷却：成功后至少等 60 秒再允许下一次生图
+// ChatGPT 对同 IP 短时间连续生图会触发 "Unusual activity" 403
+var (
+	imageCooldownMu   sync.Mutex
+	lastImageSuccess  time.Time
+	imageCooldownTime = 60 * time.Second
+)
+
 func (s *Server) generateImageWithPool(ctx context.Context, prompt, model, size, resolution string, refs [][]byte) ([]upstreamImageResult, error) {
+	// 全局冷却检查
+	imageCooldownMu.Lock()
+	if !lastImageSuccess.IsZero() {
+		elapsed := time.Since(lastImageSuccess)
+		if elapsed < imageCooldownTime {
+			wait := imageCooldownTime - elapsed
+			imageCooldownMu.Unlock()
+			traceLogf(ctx, "├─ image cooldown: waiting %v (last success %v ago)", wait, elapsed.Round(time.Second))
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(wait):
+			}
+		} else {
+			imageCooldownMu.Unlock()
+		}
+	} else {
+		imageCooldownMu.Unlock()
+	}
+
 	accounts := s.store.LoadAccounts()
 	maxAttempts := len(accounts)
 	if maxAttempts < 1 {
@@ -49,6 +78,10 @@ func (s *Server) generateImageWithPool(ctx context.Context, prompt, model, size,
 		if err == nil {
 			traceLogf(ctx, "└─ image account attempt %d success images=%d", attempt+1, len(items))
 			s.markAccountSuccess(token, true)
+			// 记录成功时间，启动全局冷却
+			imageCooldownMu.Lock()
+			lastImageSuccess = time.Now()
+			imageCooldownMu.Unlock()
 			return items, nil
 		}
 		traceLogf(ctx, "│  └─ image account attempt %d failed error=%v", attempt+1, err)
