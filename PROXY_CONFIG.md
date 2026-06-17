@@ -27,9 +27,17 @@ Environment=CHATGPT2API_UPSTREAM_TRANSPORT=curl
 
 ## 3. curl-impersonate 二进制路径
 ```
-/home/ubuntu/chat2api-go/data/bin/curl-impersonate/curl-impersonate-chrome
+/home/ubuntu/chat2api-go/data/bin/curl-impersonate/curl_edge101  (实际是 chrome116 指纹)
 ```
+
+**重要**: 默认的 `edge101` 指纹已被 Cloudflare 识别并封禁，必须替换为 `chrome116`：
+```bash
+cp data/bin/curl-impersonate/curl_chrome116 data/bin/curl-impersonate/curl_edge101
+```
+原版 edge101 备份在 `curl_edge101.bak`
+
 支持的 TLS 指纹: chrome101, chrome116, edge101 等
+**当前推荐: chrome116** (Cloudflare 暂未识别)
 
 ## 4. mihomo 代理配置 (/home/ubuntu/mihomo/config.yaml)
 关键配置:

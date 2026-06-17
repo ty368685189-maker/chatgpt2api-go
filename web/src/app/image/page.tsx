@@ -174,7 +174,7 @@ async function buildReferenceImageFromStoredImage(image: StoredImage, fileName: 
 
 function taskDataToStoredImage(image: StoredImage, task: ImageTask): StoredImage {
   if (image.status === "error" && (image.error === "用户已取消该任务" || image.error === "已取消")) {
-    if (task.status === "running" || task.status === "queued" || task.status === "pending") {
+    if (task.status === "running" || task.status === "queued") {
       return image;
     }
   }
@@ -967,11 +967,6 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     }
   }, [canUseHighResolution]);
 
-  // Reset composer state when conversation changes to avoid carrying over drafts/files
-  useEffect(() => {
-    clearComposerInputs();
-  }, [selectedConversationId, clearComposerInputs]);
-
   const resetComposer = useCallback(() => {
     clearComposerInputs();
   }, [clearComposerInputs]);
@@ -1308,13 +1303,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
         setReferenceImages((prev) => [...prev, nextReference.referenceImage]);
         setReferenceImageFiles((prev) => [...prev, nextReference.file]);
         setImagePrompt("");
-        requestAnimationFrame(() => {
-          const textarea = textareaRef.current;
-          if (textarea) {
-            textarea.focus();
-            textarea.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        });
+        textareaRef.current?.focus();
         toast.success("已加入当前参考图，继续输入描述即可编辑");
       } catch (error) {
         const message = error instanceof Error ? error.message : "读取结果图失败";
@@ -1447,7 +1436,6 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
       textarea.focus();
       const length = textarea.value.length;
       textarea.setSelectionRange(length, length);
-      textarea.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }, []);
 
@@ -1470,13 +1458,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      if (textarea) {
-        textarea.focus();
-        textarea.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    });
+    textareaRef.current?.focus();
     toast.success("已复用该卡片的完整配置（包含提示词）");
   }, [canUseHighResolution]);
 
@@ -1497,13 +1479,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-    requestAnimationFrame(() => {
-      const textarea = textareaRef.current;
-      if (textarea) {
-        textarea.focus();
-        textarea.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    });
+    textareaRef.current?.focus();
     toast.success("已套用该卡片的尺寸和参数配置（保留当前提示词）");
   }, [canUseHighResolution]);
 
@@ -2012,13 +1988,13 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
 
         while (true) {
           const latestConversation = conversationsRef.current.find((conversation) => conversation.id === conversationId);
-          const latestTurn = latestConversation?.turns.find((turn) => turn.id === activeTurn.id);
+          const latestTurn = latestConversation?.turns.find((turn) => turn.id === activeTurn.id) as ImageTurn | undefined;
           if (!latestConversation || !latestTurn) {
             break;
           }
 
           const loadingTaskIds =
-            latestTurn.images.flatMap((image) =>
+            latestTurn.images.flatMap((image: StoredImage) =>
               image.status === "loading" && image.taskId ? [image.taskId] : [],
             );
           if (loadingTaskIds.length === 0) {
@@ -2039,8 +2015,8 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
           }
 
           if (taskList.missing_ids.length > 0) {
-            const imagesToResubmit: typeof latestTurn.images = [];
-            const imagesToFail: typeof latestTurn.images = [];
+            const imagesToResubmit: StoredImage[] = [];
+            const imagesToFail: StoredImage[] = [];
 
             const missingImages = postSleepTurn.images.filter(
               (image) => image.status === "loading" && image.taskId && taskList.missing_ids.includes(image.taskId)
@@ -2066,7 +2042,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
                   turns: conversation.turns.map((turn) => {
                     if (turn.id !== activeTurn.id) return turn;
                     const images = turn.images.map((image) => {
-                      const failed = imagesToFail.find(f => (f.taskId || f.id) === (image.taskId || image.id));
+                      const failed = imagesToFail.find((f: StoredImage) => (f.taskId || f.id) === (image.taskId || image.id));
                       if (failed) {
                         return { ...image, status: "error" as const, error: "任务在服务器端丢失且重试超限" };
                       }
@@ -2081,7 +2057,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
 
             if (imagesToResubmit.length > 0) {
               const resubmissionResults = await Promise.all(
-                imagesToResubmit.map(async (image) => {
+                imagesToResubmit.map(async (image: StoredImage) => {
                   const taskId = image.taskId || image.id;
                   try {
                     const task = activeTurn.mode === "edit"
@@ -2094,12 +2070,12 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
                 })
               );
 
-              const successfulResubmitted = resubmissionResults.flatMap(r => r.task ? [r.task] : []);
+              const successfulResubmitted = resubmissionResults.flatMap((r: {taskId: string, task: ImageTask | null, error: unknown}) => r.task ? [r.task] : []);
               if (successfulResubmitted.length > 0) {
                 await applyTasks(successfulResubmitted);
               }
 
-              const failedResubmitted = resubmissionResults.filter(r => r.error);
+              const failedResubmitted = resubmissionResults.filter((r: {taskId: string, task: ImageTask | null, error: unknown}) => r.error);
               if (failedResubmitted.length > 0) {
                 await updateConversation(conversationId, (current) => {
                   const conversation = current ?? snapshot;
@@ -2109,7 +2085,7 @@ function ImagePageContent({ isAdmin }: { isAdmin: boolean }) {
                     turns: conversation.turns.map((turn) => {
                       if (turn.id !== activeTurn.id) return turn;
                       const images = turn.images.map((image) => {
-                        const failed = failedResubmitted.find(r => r.taskId === (image.taskId || image.id));
+                        const failed = failedResubmitted.find((r: {taskId: string, task: ImageTask | null, error: unknown}) => r.taskId === (image.taskId || image.id));
                         if (failed) {
                           const errMsg = failed.error instanceof Error ? failed.error.message : "重试任务提交失败";
                           return { ...image, status: "error" as const, error: errMsg };

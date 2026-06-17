@@ -1,25 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Github,
-  Sun,
-  Moon,
-  LogOut,
-  MessageSquare,
-  Image as ImageIcon,
-  BookOpen,
-  Compass,
-  Users,
-  Database,
-  Terminal,
-  Settings,
-  Key,
-  Ticket,
-  Megaphone,
-  FolderHeart
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Github, Sun, Moon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { clearAuthSessionCache, getValidatedAuthSession } from "@/lib/auth-session";
@@ -29,27 +12,27 @@ import { QuotaPopover } from "@/components/quota-popover";
 import { useTheme } from "@/hooks/use-theme";
 
 const adminNavItems = [
-  { href: "/chat", label: "对话", icon: MessageSquare },
-  { href: "/image", label: "画图", icon: ImageIcon },
-  { href: "/templates", label: "提示词模板", icon: BookOpen },
-  { href: "/gallery", label: "画廊", icon: Compass },
-  { href: "/accounts", label: "号池管理", icon: Users },
-  { href: "/image-manager", label: "图片管理", icon: Database },
-  { href: "/logs", label: "日志管理", icon: Terminal },
-  { href: "/settings", label: "设置", icon: Settings },
-  { href: "/keys", label: "用户密钥", icon: Key },
-  { href: "/invites", label: "邀请码", icon: Ticket },
-  { href: "/users", label: "注册用户", icon: Users },
-  { href: "/announcement", label: "📢 公告", icon: Megaphone },
+  { href: "/chat", label: "对话" },
+  { href: "/image", label: "画图" },
+  { href: "/templates", label: "提示词模板" },
+  { href: "/gallery", label: "画廊" },
+  { href: "/accounts", label: "号池管理" },
+  { href: "/image-manager", label: "图片管理" },
+  { href: "/logs", label: "日志管理" },
+  { href: "/settings", label: "设置" },
+  { href: "/keys", label: "用户密钥" },
+  { href: "/invites", label: "邀请码" },
+  { href: "/users", label: "注册用户" },
+  { href: "/announcement", label: "📢 公告" },
 ];
 
 const userNavItems = [
-  { href: "/chat", label: "对话", icon: MessageSquare },
-  { href: "/image", label: "画图", icon: ImageIcon },
-  { href: "/templates", label: "提示词模板", icon: BookOpen },
-  { href: "/works", label: "我的作品", icon: FolderHeart },
-  { href: "/gallery", label: "画廊", icon: Compass },
-  { href: "/announcement", label: "📢 公告", icon: Megaphone },
+  { href: "/chat", label: "对话" },
+  { href: "/image", label: "画图" },
+  { href: "/templates", label: "提示词模板" },
+  { href: "/works", label: "我的作品" },
+  { href: "/gallery", label: "画廊" },
+  { href: "/announcement", label: "📢 公告" },
 ];
 
 // next.config.ts 配了 trailingSlash: true，usePathname 返回 "/image/"，
@@ -109,17 +92,17 @@ export function TopNav() {
   const hasInitialPositionRef = useRef(false);
   const [enableTransition, setEnableTransition] = useState(false);
 
-  const measure = useCallback((href: string): Rect | null => {
+  const measure = (href: string): Rect | null => {
     const anchor = itemRefs.current.get(href);
     const nav = navRef.current;
     if (!anchor || !nav) return null;
     const navRect = nav.getBoundingClientRect();
     const rect = anchor.getBoundingClientRect();
     return {
-      left: rect.left - navRect.left + nav.scrollLeft,
+      left: rect.left - navRect.left,
       width: rect.width,
     };
-  }, []);
+  };
 
   useEffect(() => {
     if (!session) {
@@ -154,7 +137,7 @@ export function TopNav() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", update);
     };
-  }, [pathname, session, measure]);
+  }, [pathname, session]);
 
   if (pathname === "/login" || pathname === "/register" || session === undefined || !session) {
     return null;
@@ -165,8 +148,7 @@ export function TopNav() {
   // 单独一个"画图"挂在中间反而像 placeholder，logo 已经指向 /image 够用了。
   const showNav = navItems.length > 1;
   const roleLabel = session.role === "admin" ? "管理员" : "普通用户";
-  const rawName = session.name.trim();
-  const displayName = (rawName.startsWith("auto_") ? rawName.substring(5) : rawName) || roleLabel;
+  const displayName = session.name.trim() || roleLabel;
 
   // 下划线最终位置：hover 时跟 hover，否则跟 active。两段 padding 内缩 8px，
   // 让线条比文字略短一点，更精致。
@@ -180,10 +162,10 @@ export function TopNav() {
       <div className="mx-auto flex h-12 max-w-[1440px] items-center gap-3 px-4 sm:h-14 sm:gap-4 sm:px-6 lg:px-8">
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <Link href="/image" className="group flex shrink-0 -translate-y-[1px] items-center py-1">
-            <span className="text-[18px] sm:text-[20px] font-bold leading-none tracking-[-0.025em] text-foreground">
+            <span className="text-[20px] font-bold leading-none tracking-[-0.025em] text-foreground">
               Dual
             </span>
-            <span className="hidden sm:inline ml-1.5 sm:ml-2 text-[13px] sm:text-[14px] font-medium leading-none tracking-[0.02em] text-muted-foreground/80">
+            <span className="ml-2 text-[14px] font-medium leading-none tracking-[0.02em] text-muted-foreground/80">
               公益站
             </span>
           </Link>
@@ -207,7 +189,6 @@ export function TopNav() {
         >
           {navItems.map((item) => {
             const active = normalizePath(item.href) === normalizePath(pathname || "/");
-            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
@@ -221,13 +202,11 @@ export function TopNav() {
                   if (r) setHoverRect(r);
                 }}
                 className={cn(
-                  "relative shrink-0 cursor-pointer whitespace-nowrap px-3 py-1.5 text-[13px] font-medium leading-none transition-colors duration-200 flex items-center justify-center gap-1",
+                  "relative shrink-0 cursor-pointer whitespace-nowrap px-3 py-1.5 text-[13px] font-medium leading-none transition-colors duration-200",
                   active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
-                title={item.label}
               >
-                {Icon && <Icon className="size-[15px] sm:hidden block shrink-0" />}
-                <span className="hidden sm:inline">{item.label}</span>
+                {item.label}
               </Link>
             );
           })}
@@ -262,7 +241,19 @@ export function TopNav() {
             </span>
             <span className="font-data text-[10.5px] font-bold uppercase tracking-wider">Online</span>
           </span>
-          <QuotaPopover displayName={displayName} roleLabel={roleLabel} />
+          <span className="hidden items-center gap-1.5 rounded-md border border-border/70 bg-card px-2 py-1 text-[11px] leading-none md:inline-flex">
+            <span className="grid size-4 place-items-center rounded-[4px] bg-foreground text-[8px] font-bold text-background">
+              {(displayName[0] || roleLabel[0] || "U").toUpperCase()}
+            </span>
+            <span className="hidden font-data font-bold text-foreground lg:inline">{displayName}</span>
+            {displayName !== roleLabel ? (
+              <>
+                <span className="hidden text-muted-foreground/70 lg:inline">·</span>
+                <span className="hidden font-bold text-muted-foreground lg:inline">{roleLabel}</span>
+              </>
+            ) : null}
+            <QuotaPopover />
+          </span>
           <button
             type="button"
             className="flex cursor-pointer items-center justify-center rounded-md border border-transparent p-1.5 text-muted-foreground transition hover:border-border/70 hover:bg-card hover:text-foreground"
@@ -278,13 +269,10 @@ export function TopNav() {
           </button>
           <button
             type="button"
-            className="flex cursor-pointer items-center justify-center rounded-md border border-transparent p-1.5 text-muted-foreground transition hover:border-border/70 hover:bg-card hover:text-foreground"
+            className="cursor-pointer rounded-md border border-transparent px-2 py-1 text-[13px] font-bold leading-none text-muted-foreground transition hover:border-border/70 hover:bg-card hover:text-foreground"
             onClick={() => void handleLogout()}
-            title="退出登录"
-            aria-label="Logout"
           >
-            <LogOut className="size-[15px]" strokeWidth={2.5} />
-            <span className="hidden sm:inline ml-1 text-[13px] font-bold leading-none">退出</span>
+            退出
           </button>
         </div>
       </div>

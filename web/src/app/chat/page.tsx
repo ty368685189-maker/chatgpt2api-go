@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Copy, History, ImageIcon, LoaderCircle, MessageSquarePlus, Paperclip, Plus, RefreshCw, Send, Sparkles, StopCircle, Trash2, X } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ImageIcon, LoaderCircle, MessageSquarePlus, Paperclip, Plus, RefreshCw, Send, Sparkles, StopCircle, Trash2, X } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -174,10 +173,7 @@ function AssistantMarkdown({
   onOpenImage?: (src: string) => void;
   renderVideoCards?: boolean;
 }) {
-  const components = useMemo(
-    () => buildAssistantMarkdownComponents(onOpenImage, { renderVideoCards }),
-    [onOpenImage, renderVideoCards]
-  );
+  const components = buildAssistantMarkdownComponents(onOpenImage, { renderVideoCards });
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -349,30 +345,9 @@ function ChatPageContent() {
   const [selectedAccountType, setSelectedAccountType] = useState<string>(CHAT_ACCOUNT_TYPE_AUTO);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  const [isClearingAll, setIsClearingAll] = useState(false);
-  const handleClearAll = useCallback(async () => {
-    if (!window.confirm("确定要删除所有对话记录吗？此操作无法恢复。")) return;
-    setIsClearingAll(true);
-    try {
-      await Promise.all(items.map((item) => removeConversation(item.id)));
-      setMessages([]);
-      setConversationId("");
-      setActiveId("");
-      setInput("");
-      setUploads([]);
-      toast.success("已清空所有对话记录");
-    } catch {
-      toast.error("清空对话失败");
-    } finally {
-      setIsClearingAll(false);
-    }
-  }, [items, removeConversation]);
-
   const viewportRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const streamFrameRef = useRef<number | null>(null);
   const streamBufferRef = useRef("");
@@ -496,7 +471,6 @@ function ChatPageContent() {
       streamBufferRef.current = "";
       streamLastFrameAtRef.current = 0;
       streamDrainResolversRef.current.splice(0).forEach((resolve) => resolve());
-      abortRef.current?.abort();
     };
   }, []);
 
@@ -613,7 +587,6 @@ function ChatPageContent() {
     shouldStickToBottomRef.current = true;
     setMessages([...baseHistory, userMessage, assistantMessage]);
     setInput("");
-    setUploads([]);
     setIsStreaming(true);
 
     const controller = new AbortController();
@@ -767,146 +740,6 @@ function ChatPageContent() {
     queueStreamDelta,
     saveConversation,
     selectedAccountType,
-    uploads,
-    waitForStreamDrain,
-  ]);
-
-  const handleRegenerate = useCallback(async () => {
-    if (messages.length === 0 || isStreaming) return;
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage.role !== "assistant") return;
-    const baseHistory = messages.slice(0, -1);
-    const userMessage = baseHistory[baseHistory.length - 1];
-    if (!userMessage || userMessage.role !== "user") return;
-    const assistantMessage: ChatMessage = {
-      id: createId(),
-      role: "assistant",
-      content: "",
-      status: "streaming",
-      kind: isLikelyImagePrompt(userMessage.content) ? "image" : "text",
-    };
-    const apiMessages: ChatStreamMessage[] = [
-      ...baseHistory.slice(0, -1)
-        .filter((m) => m.status !== "error" && m.content.trim())
-        .map((m) => ({ role: m.role, content: m.content }) as ChatStreamMessage),
-      { role: "user", content: userMessage.content },
-    ];
-    shouldStickToBottomRef.current = true;
-    setMessages([...baseHistory.slice(0, -1), userMessage, assistantMessage]);
-    setIsStreaming(true);
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const switchAccount = forceSwitchAccount;
-    if (switchAccount) {
-      setForceSwitchAccount(false);
-    }
-    const requestedAccountType =
-      selectedAccountType === CHAT_ACCOUNT_TYPE_AUTO ? undefined : selectedAccountType;
-    let streamCid = conversationId;
-    let savedConversationId = activeId;
-    let assistantContent = "";
-    let streamFailed = false;
-    try {
-      for await (const event of streamChat(
-        {
-          model: assistantMessage.kind === "image" ? "gpt-image-2" : "auto",
-          messages: apiMessages,
-          conversation_id: conversationId || undefined,
-          force_switch_account: switchAccount || undefined,
-          account_type: requestedAccountType,
-        },
-        controller.signal,
-      )) {
-        if (event.type === "conversation.id") {
-          streamCid = event.upstream_conversation_id || event.conversation_id;
-          setConversationId(streamCid);
-        } else if (event.type === "delta") {
-          if (event.upstream_conversation_id || event.conversation_id) {
-            streamCid = event.upstream_conversation_id || event.conversation_id || streamCid;
-            setConversationId(streamCid);
-          }
-          assistantContent += event.text;
-          queueStreamDelta(assistantMessage.id, event.text);
-        } else if (event.type === "error") {
-          throw new Error(event.message);
-        } else if (event.type === "done") {
-          if (event.upstream_conversation_id || event.conversation_id) {
-            streamCid = event.upstream_conversation_id || event.conversation_id || streamCid;
-            setConversationId(streamCid);
-          }
-          await waitForStreamDrain();
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMessage.id
-                ? { ...m, status: "idle" }
-                : m,
-            ),
-          );
-        }
-      }
-    } catch (error) {
-      streamFailed = true;
-      if (controller.signal.aborted) {
-        return;
-      }
-      const message = error instanceof Error ? error.message : "对话失败";
-      setMessages((prev) =>
-        prev.map((m) => (m.id === assistantMessage.id ? { ...m, status: "error", error: message } : m)),
-      );
-      toast.error(message);
-    } finally {
-      if (abortRef.current === controller) {
-        abortRef.current = null;
-      }
-      if (streamFailed || controller.signal.aborted) {
-        flushStreamBuffer(assistantMessage.id);
-      } else {
-        await waitForStreamDrain();
-      }
-      setIsStreaming(false);
-    }
-    if (streamFailed) {
-      return;
-    }
-    if (!assistantContent.trim()) {
-      const message = "上游没有返回内容";
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMessage.id
-            ? { ...m, status: "error", error: message }
-            : m,
-        ),
-      );
-      toast.error(message);
-      return;
-    }
-    const persisted: ChatPersistedMessage[] = [
-      ...toPersistedMessages(baseHistory.slice(0, -1)),
-      { role: "user", content: userMessage.content },
-      { role: "assistant", content: assistantContent },
-    ];
-    try {
-      const saved = await saveConversation({
-        id: savedConversationId || activeId || undefined,
-        title: deriveTitle(persisted),
-        messages: persisted,
-        upstream_conversation_id: streamCid || undefined,
-      });
-      setActiveId(saved.id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "会话保存失败";
-      toast.error(message);
-    }
-  }, [
-    activeId,
-    conversationId,
-    flushStreamBuffer,
-    forceSwitchAccount,
-    isStreaming,
-    messages,
-    queueStreamDelta,
-    saveConversation,
-    selectedAccountType,
     waitForStreamDrain,
   ]);
 
@@ -944,33 +777,15 @@ function ChatPageContent() {
     <>
     <section className="relative mx-auto flex h-[calc(100dvh-3.5rem)] min-h-0 w-full max-w-[1180px] gap-3 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] sm:h-[calc(100dvh-4rem)] sm:px-4 sm:pb-6">
       <aside className="hidden w-[260px] shrink-0 flex-col gap-2 pt-3 md:flex">
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="h-9 flex-1 cursor-pointer justify-start rounded-lg border-border bg-card/90 px-3 text-foreground"
-            onClick={handleNewChat}
-            disabled={isStreaming}
-          >
-            <MessageSquarePlus className="size-4" />
-            <span className="text-[13px]">新建对话</span>
-          </Button>
-          {sortedItems.length > 0 && (
-            <Button
-              variant="outline"
-              size="icon"
-              title="清空所有对话"
-              className="h-9 w-9 shrink-0 cursor-pointer rounded-lg border-border bg-card/90 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/20"
-              onClick={handleClearAll}
-              disabled={isStreaming || isClearingAll}
-            >
-              {isClearingAll ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <Trash2 className="size-4" />
-              )}
-            </Button>
-          )}
-        </div>
+        <Button
+          variant="outline"
+          className="h-9 cursor-pointer justify-start rounded-lg border-border bg-card/90 px-3 text-foreground"
+          onClick={handleNewChat}
+          disabled={isStreaming}
+        >
+          <MessageSquarePlus className="size-4" />
+          <span className="text-[13px]">新建对话</span>
+        </Button>
         <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto rounded-xl border border-border/50 bg-card/40 p-2">
           {isLoadingList && !hasLoaded ? (
             <div className="flex items-center justify-center py-10">
@@ -1039,18 +854,10 @@ function ChatPageContent() {
             variant="outline"
             className="h-9 cursor-pointer rounded-lg border-border bg-card/90 px-3 text-foreground"
             onClick={handleNewChat}
-            disabled={isStreaming}
+            disabled={messages.length === 0 && !isStreaming}
           >
             <Plus className="size-4" />
-            <span className="text-[13px]">新建</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-9 cursor-pointer rounded-lg border-border bg-card/90 px-3 text-foreground"
-            onClick={() => setIsHistoryOpen(true)}
-          >
-            <History className="size-4" />
-            <span className="text-[13px]">历史</span>
+            <span className="text-[13px]">新建对话</span>
           </Button>
           {conversationId ? (
             <span className="ml-auto truncate font-data text-[10px] text-muted-foreground/70">
@@ -1071,7 +878,7 @@ function ChatPageContent() {
           ) : (
             <div className="flex flex-col gap-4">
               {messages.map((message) => (
-                <div key={message.id} className={cn("flex w-full flex-col", message.role === "user" ? "items-end" : "items-start")}>
+                <div key={message.id} className={cn("flex w-full", message.role === "user" ? "justify-end" : "justify-start")}>
                   <div
                     className={cn(
                       "max-w-[85%] rounded-2xl px-4 py-2.5 text-[14px] leading-6",
@@ -1113,36 +920,6 @@ function ChatPageContent() {
                       <span className="whitespace-pre-wrap break-words">{message.content}</span>
                     )}
                   </div>
-                  {/* Action buttons under assistant message */}
-                  {message.role === "assistant" && !isStreaming ? (
-                    <div className="mt-1.5 flex items-center gap-2 px-1 text-xs text-muted-foreground select-none">
-                      {message.content && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(message.content);
-                            toast.success("已复制到剪贴板");
-                          }}
-                          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
-                          title="复制回答内容"
-                        >
-                          <Copy className="size-3" strokeWidth={2} />
-                          <span>复制</span>
-                        </button>
-                      )}
-                      {messages[messages.length - 1].id === message.id && (
-                        <button
-                          type="button"
-                          onClick={handleRegenerate}
-                          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
-                          title="重新生成回答"
-                        >
-                          <RefreshCw className="size-3" strokeWidth={2} />
-                          <span>重新生成</span>
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
                 </div>
               ))}
             </div>
@@ -1150,33 +927,6 @@ function ChatPageContent() {
         </div>
 
         <div className="shrink-0 rounded-xl border border-border/60 bg-background p-2 shadow-sm">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => handleFileInput(e.target.files)}
-          />
-          {uploads.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-2 pb-2">
-              {uploads.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center gap-1.5 rounded-lg border border-border bg-secondary/60 pl-2.5 pr-1.5 py-1 text-xs text-foreground select-none animate-in fade-in zoom-in-95 duration-150"
-                >
-                  <span className="truncate max-w-[120px] font-medium">{file.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => setUploads((current) => current.filter((item) => item.id !== file.id))}
-                    className="flex size-4.5 cursor-pointer items-center justify-center rounded-full text-muted-foreground/60 hover:bg-secondary hover:text-foreground transition-colors"
-                    aria-label={`移除附件 ${file.name}`}
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
           <textarea
             ref={textareaRef}
             value={input}
@@ -1184,42 +934,26 @@ function ChatPageContent() {
             onKeyDown={handleKeyDown}
             placeholder="发送消息，或描述你想画的图..."
             rows={1}
-            className="hide-scrollbar w-full resize-none bg-transparent px-2 py-2 text-base sm:text-[14px] leading-6 text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
+            className="hide-scrollbar w-full resize-none bg-transparent px-2 py-2 text-[14px] leading-6 text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
           />
           <div className="flex items-center justify-between gap-2 pt-1">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9 shrink-0 cursor-pointer rounded-lg border-border bg-background text-muted-foreground hover:text-foreground shadow-none"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isStreaming}
-                title="添加附件 (支持图片等)"
-                aria-label="Upload files"
-              >
-                <Paperclip className="size-4" strokeWidth={2.25} />
-              </Button>
-              <Select
-                value={selectedAccountType}
-                onValueChange={setSelectedAccountType}
-                disabled={isStreaming || accountTypes.length === 0}
-              >
-                <SelectTrigger className="h-9 w-[116px] shrink-0 rounded-lg border-border bg-background px-3 text-[12px] shadow-none">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={CHAT_ACCOUNT_TYPE_AUTO}>自动</SelectItem>
-                  {accountTypes.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {formatChatAccountType(type)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="hidden text-[11.5px] text-muted-foreground/60 sm:inline select-none">
-                Enter 发送 / Shift + Enter 换行
-              </span>
-            </div>
+            <Select
+              value={selectedAccountType}
+              onValueChange={setSelectedAccountType}
+              disabled={isStreaming || accountTypes.length === 0}
+            >
+              <SelectTrigger className="h-9 w-[116px] shrink-0 rounded-lg border-border bg-background px-3 text-[12px] shadow-none">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={CHAT_ACCOUNT_TYPE_AUTO}>自动</SelectItem>
+                {accountTypes.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {formatChatAccountType(type)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="flex items-center justify-end gap-2">
               {conversationId && !isStreaming ? (
                 <Button
@@ -1263,89 +997,6 @@ function ChatPageContent() {
       onOpenChange={setLightboxOpen}
       onIndexChange={setLightboxIndex}
     />
-    <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-      <DialogContent className="flex h-[80vh] flex-col rounded-[24px] border-border bg-card p-0 shadow-[0_28px_90px_rgba(0,0,0,0.2)]">
-        <DialogHeader className="border-b border-border/50 px-4 py-3 sm:px-5 flex flex-row items-center justify-between space-y-0">
-          <DialogTitle className="text-base font-semibold">对话历史</DialogTitle>
-          {sortedItems.length > 0 && (
-            <button
-              type="button"
-              className="text-xs text-rose-500 hover:text-rose-600 font-medium transition disabled:opacity-50"
-              onClick={() => {
-                void handleClearAll();
-                setIsHistoryOpen(false);
-              }}
-              disabled={isStreaming || isClearingAll}
-            >
-              清空所有
-            </button>
-          )}
-        </DialogHeader>
-        <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
-          {isLoadingList && !hasLoaded ? (
-            <div className="flex items-center justify-center py-10">
-              <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
-            </div>
-          ) : sortedItems.length === 0 ? (
-            <div className="py-8 text-center text-xs text-muted-foreground/60">暂无对话记录</div>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {sortedItems.map((item) => {
-                const isActive = item.id === activeId;
-                const isDeleting = pendingDelete === item.id;
-                return (
-                  <li key={item.id}>
-                    <div
-                      className={cn(
-                        "group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-[13px] transition-colors",
-                        isActive
-                          ? "bg-foreground text-background"
-                          : "text-foreground hover:bg-secondary",
-                      )}
-                      onClick={() => {
-                        handleSelect(item.id);
-                        setIsHistoryOpen(false);
-                      }}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate">{item.title || "新对话"}</div>
-                        <div
-                          className={cn(
-                            "mt-0.5 truncate text-[10px]",
-                            isActive ? "text-background/70" : "text-muted-foreground/70",
-                          )}
-                        >
-                          {formatTime(item.updated_at)}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className={cn(
-                          "rounded-md p-1 opacity-100 hover:bg-rose-100 hover:text-rose-600 md:opacity-0 md:group-hover:opacity-100",
-                          isActive && "hover:bg-rose-950/20 hover:text-rose-300 text-background/60",
-                        )}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleDelete(item.id);
-                        }}
-                        disabled={isDeleting}
-                        aria-label="删除对话"
-                      >
-                        {isDeleting ? (
-                          <LoaderCircle className="size-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="size-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
     </>
   );
 }

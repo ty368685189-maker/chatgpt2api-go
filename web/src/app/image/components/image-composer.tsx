@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUp, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight, ImagePlus, Infinity as InfinityIcon, Sparkles, Trash2, X } from "lucide-react";
+import { ArrowUp, BookOpen, Check, ChevronDown, ChevronLeft, ChevronRight, CornerDownRight, ImagePlus, Infinity as InfinityIcon, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import {
   useEffect,
@@ -38,21 +38,6 @@ const RESOLUTION_OPTIONS: ResolutionOption[] = [
 
 const TEXTAREA_MIN_HEIGHT = 96;
 const TEXTAREA_MAX_HEIGHT = 360;
-
-const hasImageItem = (event: DragEvent<HTMLDivElement>) => {
-  const items = event.dataTransfer?.items;
-  if (items && items.length > 0) {
-    for (let index = 0; index < items.length; index += 1) {
-      const item = items[index];
-      if (item.kind === "file" && item.type.startsWith("image/")) {
-        return true;
-      }
-    }
-    return false;
-  }
-  // Fallback：某些浏览器在 dragenter 阶段无法读 items.type，按 file 类型放行
-  return Array.from(event.dataTransfer?.types || []).includes("Files");
-};
 
 type PromptTemplate = {
   id: string;
@@ -128,23 +113,25 @@ export function ImageComposer({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  const handleDragStartItem = useCallback((e: React.DragEvent, index: number) => {
+  const handleDragStartItem = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", String(index));
-  }, []);
+  };
 
-  const handleDragOverItem = useCallback((e: React.DragEvent, index: number) => {
+  const handleDragOverItem = (e: React.DragEvent, index: number) => {
     if (draggedIndex === null) return;
     e.preventDefault();
-    setDragOverIndex((prev) => (prev !== index ? index : prev));
-  }, [draggedIndex]);
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
 
-  const handleDragLeaveItem = useCallback(() => {
+  const handleDragLeaveItem = () => {
     setDragOverIndex(null);
-  }, []);
+  };
 
-  const handleDropItem = useCallback((e: React.DragEvent, targetIndex: number) => {
+  const handleDropItem = (e: React.DragEvent, targetIndex: number) => {
     e.preventDefault();
     setDragOverIndex(null);
     if (draggedIndex === null || draggedIndex === targetIndex) {
@@ -153,12 +140,12 @@ export function ImageComposer({
     }
     onReorderReferenceImages(draggedIndex, targetIndex);
     setDraggedIndex(null);
-  }, [draggedIndex, onReorderReferenceImages]);
+  };
 
-  const handleDragEndItem = useCallback(() => {
+  const handleDragEndItem = () => {
     setDraggedIndex(null);
     setDragOverIndex(null);
-  }, []);
+  };
 
   const dragCounterRef = useRef(0);
   const sizeMenuRef = useRef<HTMLDivElement>(null);
@@ -195,7 +182,7 @@ export function ImageComposer({
     }
   }, []);
 
-  const saveTemplate = useCallback(() => {
+  const saveTemplate = () => {
     if (!prompt.trim() || !newTemplateName.trim()) return;
     const newTpl: PromptTemplate = {
       id: `custom-${Date.now()}`,
@@ -208,16 +195,16 @@ export function ImageComposer({
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     }
     setNewTemplateName("");
-  }, [prompt, newTemplateName, templates]);
+  };
 
-  const deleteTemplate = useCallback((id: string, e: React.MouseEvent) => {
+  const deleteTemplate = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = templates.filter((t) => t.id !== id);
     setTemplates(updated);
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     }
-  }, [templates]);
+  };
 
   useEffect(() => {
     if (!isTemplateMenuOpen) {
@@ -307,13 +294,13 @@ export function ImageComposer({
       setIsCountMenuOpen(false);
       setIsTemplateMenuOpen(false);
     };
-    window.addEventListener("scroll", handleScroll, { capture: true, passive: true });
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      window.removeEventListener("scroll", handleScroll, { capture: true });
+      window.removeEventListener("scroll", handleScroll);
     };
   }, []);
 
-  const handleTextareaPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
+  const handleTextareaPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const imageFiles = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
     if (imageFiles.length === 0) {
       return;
@@ -321,18 +308,33 @@ export function ImageComposer({
 
     event.preventDefault();
     void onReferenceImageChange(imageFiles);
-  }, [onReferenceImageChange]);
+  };
 
-  const handleDragEnter = useCallback((event: DragEvent<HTMLDivElement>) => {
+  const hasImageItem = (event: DragEvent<HTMLDivElement>) => {
+    const items = event.dataTransfer?.items;
+    if (items && items.length > 0) {
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index];
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          return true;
+        }
+      }
+      return false;
+    }
+    // Fallback：某些浏览器在 dragenter 阶段无法读 items.type，按 file 类型放行
+    return Array.from(event.dataTransfer?.types || []).includes("Files");
+  };
+
+  const handleDragEnter = (event: DragEvent<HTMLDivElement>) => {
     if (!hasImageItem(event)) {
       return;
     }
     event.preventDefault();
     dragCounterRef.current += 1;
     setIsDraggingOver(true);
-  }, []);
+  };
 
-  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
     if (!hasImageItem(event)) {
       return;
     }
@@ -340,9 +342,9 @@ export function ImageComposer({
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = "copy";
     }
-  }, []);
+  };
 
-  const handleDragLeave = useCallback((event: DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
     if (dragCounterRef.current === 0) {
       return;
     }
@@ -351,9 +353,9 @@ export function ImageComposer({
     if (dragCounterRef.current === 0) {
       setIsDraggingOver(false);
     }
-  }, []);
+  };
 
-  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
     dragCounterRef.current = 0;
     setIsDraggingOver(false);
     const imageFiles = Array.from(event.dataTransfer?.files || []).filter((file) =>
@@ -364,7 +366,7 @@ export function ImageComposer({
     }
     event.preventDefault();
     void onReferenceImageChange(imageFiles);
-  }, [onReferenceImageChange]);
+  };
 
   return (
     <div className="shrink-0 flex justify-center px-1 sm:px-0">
@@ -521,33 +523,6 @@ export function ImageComposer({
                     onClick={onCancelReply}
                     className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground relative after:absolute after:inset-[-8px] after:content-['']"
                     aria-label="取消回复"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-            {referenceImages.length > 0 && !replyTarget ? (
-              <div
-                className="mx-3 mt-3 flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-500/10 px-3 py-2 sm:mx-5 sm:mt-4 text-amber-700 dark:text-amber-400 dark:border-amber-900/50"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-card text-amber-600 dark:text-amber-400 ring-1 ring-border">
-                  <Sparkles className="size-3" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[11px] font-medium">
-                    <span>已开启编辑模式 (图生图)</span>
-                    <span className="text-amber-500/30">·</span>
-                    <span className="text-muted-foreground/60">将基于上方参考图修改画面</span>
-                  </div>
-                </div>
-                {onCancelReply ? (
-                  <button
-                    type="button"
-                    onClick={onCancelReply}
-                    className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted-foreground transition hover:bg-secondary hover:text-foreground relative after:absolute after:inset-[-8px] after:content-['']"
-                    title="取消编辑"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -831,7 +806,7 @@ export function ImageComposer({
                         setIsTemplateMenuOpen(false);
                         if (!isSizeMenuOpen && sizeMenuBtnRef.current) {
                           const rect = sizeMenuBtnRef.current.getBoundingClientRect();
-                          const menuWidth = Math.min(300, window.innerWidth - 32);
+                          const menuWidth = Math.min(232, window.innerWidth - 32);
                           setSizeMenuPos({
                             top: rect.top - 8,
                             left: Math.max(16, Math.min(rect.left, window.innerWidth - menuWidth - 16)),
@@ -865,70 +840,71 @@ export function ImageComposer({
                     {isSizeMenuOpen ? (
                       <div
                         ref={sizeMenuRef}
-                        className="fixed z-[80] rounded-2xl border border-border bg-card p-2.5 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
+                        className="fixed z-[80] max-h-[55dvh] overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_2px_4px_rgba(15,23,42,0.04),0_24px_48px_-16px_rgba(15,23,42,0.18)]"
                         style={{
                           top: sizeMenuPos.top,
                           left: sizeMenuPos.left,
                           transform: "translateY(-100%)",
-                          width: "min(300px, calc(100vw - 2rem))",
+                          width: "min(232px, calc(100vw - 2rem))",
                         }}
                       >
-                        <div className="mb-2 px-1 text-[11px] font-semibold text-muted-foreground">画面比例</div>
-                        <div className="grid grid-cols-3 gap-2">
-                          {SIZE_OPTIONS.map((option) => {
-                            const active = option.value === imageSize;
-                            return (
-                              <button
-                                key={option.label}
-                                type="button"
+                        <div className="mb-1 px-2 pt-1 text-[11px] font-medium text-muted-foreground">画面比例</div>
+                        {SIZE_OPTIONS.map((option) => {
+                          const active = option.value === imageSize;
+                          return (
+                            <button
+                              key={option.label}
+                              type="button"
+                              className={cn(
+                                "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition",
+                                active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-secondary",
+                              )}
+                              onClick={() => {
+                                onImageSizeChange(option.value);
+                                setIsSizeMenuOpen(false);
+                              }}
+                            >
+                              <span
                                 className={cn(
-                                  "relative flex flex-col items-center justify-center rounded-xl p-2 transition border cursor-pointer",
-                                  active
-                                    ? "bg-primary border-primary text-primary-foreground shadow-sm"
-                                    : "border-border/60 bg-secondary/35 text-foreground hover:bg-secondary hover:text-foreground",
+                                  "flex size-8 shrink-0 items-center justify-center rounded-md",
+                                  active ? "bg-white/10" : "bg-secondary",
                                 )}
-                                onClick={() => {
-                                  onImageSizeChange(option.value);
-                                  setIsSizeMenuOpen(false);
-                                }}
                               >
-                                {/* aspect ratio shape preview */}
-                                <div className="flex h-11 w-full items-center justify-center mb-1.5">
-                                  {option.value ? (
-                                    <div
-                                      className={cn(
-                                        "rounded-[4px] border shadow-sm transition-all duration-200",
-                                        active
-                                          ? "border-primary-foreground bg-primary-foreground/20 scale-105"
-                                          : "border-muted-foreground/60 bg-muted-foreground/5",
-                                      )}
-                                      style={{
-                                        width: `${option.w * 1.1}px`,
-                                        height: `${option.h * 1.1}px`,
-                                      }}
-                                    />
-                                  ) : (
-                                    <div
-                                      className={cn(
-                                        "size-6 rounded-[4px] border border-dashed transition-all",
-                                        active ? "border-primary-foreground/85 scale-105" : "border-stone-400/70",
-                                      )}
-                                    />
-                                  )}
-                                </div>
-                                <span className="font-data text-[12px] font-bold tracking-tight">{option.label}</span>
+                                {option.value ? (
+                                  <span
+                                    className={cn(
+                                      "block rounded-[2px] border",
+                                      active ? "border-primary-foreground/80" : "border-muted-foreground/60",
+                                    )}
+                                    style={{
+                                      width: `${option.w * 0.7}px`,
+                                      height: `${option.h * 0.7}px`,
+                                    }}
+                                  />
+                                ) : (
+                                  <span
+                                    className={cn(
+                                      "block size-4 rounded-[2px] border border-dashed",
+                                      active ? "border-white/70" : "border-stone-400",
+                                    )}
+                                  />
+                                )}
+                              </span>
+                              <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                                <span className="font-data text-[13px] font-semibold tabular-nums">{option.label}</span>
                                 <span
                                   className={cn(
-                                    "text-[9px] mt-0.5 opacity-80 whitespace-nowrap",
-                                    active ? "text-primary-foreground/90" : "text-muted-foreground",
+                                    "truncate text-[11px]",
+                                    active ? "text-white/70" : "text-stone-400",
                                   )}
                                 >
                                   {option.desc}
                                 </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                              </span>
+                              {active ? <Check className="size-3.5 shrink-0" /> : null}
+                            </button>
+                          );
+                        })}
                       </div>
                     ) : null}
                   </div>

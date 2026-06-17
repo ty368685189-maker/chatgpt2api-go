@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Copy,
   Download,
@@ -13,17 +13,11 @@ import {
   Trash2,
   X,
   Star,
-  CheckSquare,
-  Search,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +30,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   deleteManagedImages,
   downloadSingleImage,
-  downloadImages,
   fetchMyWorks,
   getMyPublishedBatch,
   publishGalleryItem,
@@ -89,7 +82,7 @@ function WorksPageContent() {
     }
   }, []);
 
-  const saveFavorites = useCallback((list: ManagedImage[]) => {
+  const saveFavorites = (list: ManagedImage[]) => {
     setFavorites(list);
     if (typeof window !== "undefined") {
       try {
@@ -98,7 +91,7 @@ function WorksPageContent() {
         console.error("Failed to save favorites:", err);
       }
     }
-  }, []);
+  };
 
   const isFavorited = useCallback((item: ManagedImage) => {
     const key = imageKey(item);
@@ -117,65 +110,9 @@ function WorksPageContent() {
       toast.success("已添加收藏");
     }
     saveFavorites(next);
-  }, [favorites, saveFavorites]);
+  }, [favorites]);
 
-  const [isBatchMode, setIsBatchMode] = useState(false);
-  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
-  const selectedSet = useMemo(() => new Set(selectedPaths), [selectedPaths]);
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [ratioFilter, setRatioFilter] = useState<"all" | "square" | "landscape" | "portrait">("all");
-
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isBatchPublishing, setIsBatchPublishing] = useState(false);
-  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
-  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
-
-  const togglePaths = useCallback((paths: string[], checked: boolean) => {
-    setSelectedPaths((current) =>
-      checked
-        ? Array.from(new Set([...current, ...paths]))
-        : current.filter((path) => !paths.includes(path))
-    );
-  }, []);
-
-  const displayedItems = useMemo(() => {
-    let result = activeTab === "all" ? items : favorites;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter((item) => (item.prompt || "").toLowerCase().includes(q));
-    }
-    if (ratioFilter !== "all") {
-      result = result.filter((item) => {
-        if (!item.width || !item.height) return ratioFilter === "square"; // 兜底
-        if (item.width === item.height) return ratioFilter === "square";
-        if (item.width > item.height) return ratioFilter === "landscape";
-        return ratioFilter === "portrait";
-      });
-    }
-    return result;
-  }, [items, favorites, activeTab, searchQuery, ratioFilter]);
-
-  const masonryColumns = useMemo(() => {
-    if (columnCount <= 0) return [];
-    const cols = columnCount;
-    const buckets: ManagedImage[][] = Array.from({ length: cols }, () => []);
-    // 列内累计"高度"近似值：用 1/ratio (= height/width) 做单位列宽下的相对高度
-    const heights = new Array(cols).fill(0);
-    for (const item of displayedItems) {
-      const w = item.width && item.width > 0 ? item.width : 1;
-      const h = item.height && item.height > 0 ? item.height : 1;
-      const relativeH = h / w;
-      // 选当前最短列
-      let target = 0;
-      for (let i = 1; i < cols; i++) {
-        if (heights[i] < heights[target]) target = i;
-      }
-      buckets[target].push(item);
-      heights[target] += relativeH;
-    }
-    return buckets;
-  }, [displayedItems, columnCount]);
+  const displayedItems = activeTab === "all" ? items : favorites;
 
   // Pinterest 风格 masonry：列宽 flex-1 边到边等分容器（不留白），列数随容器宽度走。
   //   - 列数 = round((容器宽 + gap) / (目标列宽 240 + gap))
@@ -418,157 +355,6 @@ function WorksPageContent() {
     }
   }, [focused, pendingDelete]);
 
-  const handleBatchDownload = useCallback(async () => {
-    if (selectedPaths.length === 0) return;
-    setIsDownloading(true);
-    try {
-      await downloadImages(selectedPaths);
-      toast.success("已开始下载打包图片");
-    } catch {
-      toast.error("批量下载失败");
-    } finally {
-      setIsDownloading(false);
-    }
-  }, [selectedPaths]);
-
-  const handleBatchFavorite = useCallback(() => {
-    if (selectedPaths.length === 0) return;
-    const selectedItems = displayedItems.filter((item) => selectedSet.has(imageKey(item)));
-    const allFav = selectedItems.every((item) => isFavorited(item));
-    let nextFavorites = [...favorites];
-    if (allFav) {
-      const keysToRemove = new Set(selectedPaths);
-      nextFavorites = favorites.filter((fav) => !keysToRemove.has(imageKey(fav)));
-      toast.success("已批量取消收藏");
-    } else {
-      const existingKeys = new Set(favorites.map(imageKey));
-      const toAdd = selectedItems.filter((item) => !existingKeys.has(imageKey(item)));
-      nextFavorites = [...toAdd, ...favorites];
-      toast.success("已批量添加收藏");
-    }
-    saveFavorites(nextFavorites);
-    setSelectedPaths([]);
-    setIsBatchMode(false);
-  }, [selectedPaths, displayedItems, selectedSet, isFavorited, favorites]);
-
-  const handleBatchPublish = useCallback(async () => {
-    if (selectedPaths.length === 0) return;
-    setIsBatchPublishing(true);
-    let successCount = 0;
-    let failCount = 0;
-    try {
-      const selectedItems = displayedItems.filter((item) => selectedSet.has(imageKey(item)));
-      const results = await Promise.allSettled(
-        selectedItems.map(async (item) => {
-          const rel = item.rel || item.path;
-          if (!rel) throw new Error("No rel");
-          const prompt = (item.prompt ?? "").trim();
-          await publishGalleryItem({
-            image_rel: rel,
-            prompt,
-            model: "",
-            size: "",
-            width: item.width || 0,
-            height: item.height || 0,
-          });
-          setPublishStates((prev) => new Map(prev).set(rel, "published"));
-        })
-      );
-      results.forEach((res) => {
-        if (res.status === "fulfilled") {
-          successCount++;
-        } else {
-          failCount++;
-        }
-      });
-      if (successCount > 0) {
-        toast.success(`成功发布 ${successCount} 张图片到画廊`);
-      }
-      if (failCount > 0) {
-        toast.error(`${failCount} 张图片发布失败`);
-      }
-      setSelectedPaths([]);
-      setIsBatchMode(false);
-    } catch {
-      toast.error("批量发布失败");
-    } finally {
-      setIsBatchPublishing(false);
-    }
-  }, [selectedPaths, displayedItems, selectedSet]);
-
-  const handleConfirmBatchDelete = useCallback(async () => {
-    if (selectedPaths.length === 0) return;
-    setIsBatchDeleting(true);
-    try {
-      const resp = await deleteManagedImages({ paths: selectedPaths });
-      if (resp.removed > 0) {
-        toast.success(`已删除 ${resp.removed} 张图片`);
-        setItems((prev) => prev.filter((item) => !selectedSet.has(imageKey(item))));
-        const nextFavorites = favorites.filter((fav) => !selectedSet.has(imageKey(fav)));
-        saveFavorites(nextFavorites);
-      } else {
-        toast.error("删除失败");
-      }
-      setSelectedPaths([]);
-      setIsBatchMode(false);
-      setIsBatchDeleteOpen(false);
-    } catch {
-      toast.error("删除操作失败");
-    } finally {
-      setIsBatchDeleting(false);
-    }
-  }, [selectedPaths, selectedSet, favorites]);
-
-  const goPrev = useCallback(() => {
-    if (!focused) return;
-    const idx = displayedItems.findIndex((it) => imageKey(it) === imageKey(focused));
-    if (idx > 0) setFocused(displayedItems[idx - 1]);
-  }, [focused, displayedItems]);
-
-  const goNext = useCallback(() => {
-    if (!focused) return;
-    const idx = displayedItems.findIndex((it) => imageKey(it) === imageKey(focused));
-    if (idx !== -1 && idx < displayedItems.length - 1) setFocused(displayedItems[idx + 1]);
-  }, [focused, displayedItems]);
-
-  useEffect(() => {
-    if (!focused) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        goPrev();
-      } else if (e.key === "ArrowRight") {
-        e.preventDefault();
-        goNext();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [focused, goPrev, goNext]);
-
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartRef.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-    };
-  };
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartRef.current === null) return;
-    const deltaX = e.changedTouches[0].clientX - touchStartRef.current.x;
-    const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
-    touchStartRef.current = null;
-    
-    // 阈值设为 80px，且横向移动必须大于纵向移动的 2.5 倍，并且纵向移动不能超过 30px，以防上下滚动误触切图
-    if (Math.abs(deltaX) > 80 && Math.abs(deltaX) > Math.abs(deltaY) * 2.5 && Math.abs(deltaY) < 30) {
-      if (deltaX > 0) {
-        goPrev();
-      } else {
-        goNext();
-      }
-    }
-  };
-
   const visibleCount = displayedItems.length;
 
   // 关闭弹窗时，focused 立刻置 null 会让 {focused ? ... : null} 内容瞬间从 DOM 消失，
@@ -580,10 +366,6 @@ function WorksPageContent() {
     if (focused) setLastFocused(focused);
   }, [focused]);
   const focusedView = focused ?? lastFocused;
-
-  const focusedIdx = focusedView ? displayedItems.findIndex((it) => imageKey(it) === imageKey(focusedView)) : -1;
-  const hasPrev = focusedIdx > 0;
-  const hasNext = focusedIdx !== -1 && focusedIdx < displayedItems.length - 1;
 
   const focusedPublishState = focused ? publishStates.get(imageKey(focused)) : undefined;
 
@@ -606,69 +388,16 @@ function WorksPageContent() {
 
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            variant={isBatchMode ? "default" : "outline"}
-            className={cn(
-              "h-10 rounded-xl border-border px-4 transition",
-              isBatchMode
-                ? "bg-foreground text-background hover:bg-foreground/90"
-                : "bg-card/80 text-foreground hover:bg-secondary"
-            )}
-            onClick={() => {
-              setIsBatchMode(!isBatchMode);
-              setSelectedPaths([]);
-            }}
-            disabled={isLoading}
-          >
-            <CheckSquare className="size-4" />
-            {isBatchMode ? "退出管理" : "批量管理"}
-          </Button>
-          <Button
             variant="outline"
             className="h-10 rounded-xl border-border bg-card/80 px-4 text-foreground hover:bg-secondary hover:text-foreground"
             onClick={() => void reload()}
-            disabled={isLoading || isBatchMode}
+            disabled={isLoading}
           >
             <RefreshCw className={cn("size-4", isLoading && "animate-spin")} />
             刷新
           </Button>
         </div>
       </section>
-
-      {/* 搜索与比例筛选排 */}
-      <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground/60" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索提示词关键词..."
-            className="h-10 w-full rounded-xl border border-border bg-card/80 pl-9 pr-8 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-foreground focus:outline-none transition-colors"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute top-1/2 right-2.5 inline-flex size-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground/60 hover:bg-secondary hover:text-foreground"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Select value={ratioFilter} onValueChange={(v) => setRatioFilter(v as typeof ratioFilter)}>
-            <SelectTrigger className="h-10 w-[140px] rounded-xl border-border bg-card/80 text-xs text-foreground focus:ring-0">
-              <SelectValue placeholder="比例筛选" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl border-border bg-card">
-              <SelectItem value="all" className="text-xs">全部比例</SelectItem>
-              <SelectItem value="square" className="text-xs">正方形 (1:1)</SelectItem>
-              <SelectItem value="landscape" className="text-xs">横版图 (宽 &gt; 高)</SelectItem>
-              <SelectItem value="portrait" className="text-xs">竖版图 (宽 &lt; 高)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
 
       {/* Tabs Selector */}
       <div className="mt-4 flex gap-1.5 border-b border-border/50 pb-px">
@@ -733,58 +462,63 @@ function WorksPageContent() {
         </Card>
       ) : null}
 
+      {/* Pinterest 风格 masonry：列宽 flex-1 边到边等分容器，不留白。
+          - 列数变化时单列宽只变 ~15%，比固定列宽的"侧边留白突变"更柔和
+          - 列内"最短列优先"分桶，矮卡紧贴下一张
+          - columnCount === 0 表示还没测量，先不渲染避免 SSR/CSR 不一致闪烁
+          - 卡片去掉边框/默认 overlay，让图片本身说话；prompt + 时间只在 hover 时浮现
+          - 不依赖图片真实高度，只按 aspectRatio 估"列内累计高度"分桶
+        */}
       <div
         ref={containerRef}
         className="mt-6 flex gap-3"
         style={{ alignItems: "flex-start" }}
       >
-        {columnCount > 0 && masonryColumns.map((bucket, colIdx) => (
-          <div
-            key={colIdx}
-            className="flex flex-1 flex-col gap-3"
-            style={{ minWidth: 0 }}
-          >
-            {bucket.map((item) => {
-              const ratio =
-                item.width && item.height && item.width > 0 && item.height > 0
-                  ? item.width / item.height
-                  : 1;
-              const state = publishStates.get(imageKey(item));
-              return (
-                <button
-                  key={imageKey(item)}
-                  type="button"
-                  onClick={() => {
-                    if (isBatchMode) {
-                      const key = imageKey(item);
-                      togglePaths([key], !selectedSet.has(key));
-                    } else {
-                      setFocused(item);
-                    }
-                  }}
-                  className="group relative w-full overflow-hidden rounded-xl bg-card border border-border/40 hover:border-border/80 transition-colors shadow-sm select-none"
-                  style={{ aspectRatio: String(ratio) }}
-                >
-                  {isBatchMode && (
-                    <div
-                      className="absolute top-2 left-2 z-20"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Checkbox
-                        checked={selectedSet.has(imageKey(item))}
-                        onCheckedChange={(checked) => togglePaths([imageKey(item)], Boolean(checked))}
-                        className="size-5 rounded-md border-white/60 bg-black/40 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                      />
-                    </div>
-                  )}
-                  {/* Star icon overlay */}
+        {columnCount > 0 && (() => {
+          const cols = columnCount;
+          const buckets: ManagedImage[][] = Array.from({ length: cols }, () => []);
+          // 列内累计"高度"近似值：用 1/ratio (= height/width) 做单位列宽下的相对高度
+          const heights = new Array(cols).fill(0);
+          for (const item of displayedItems) {
+            const w = item.width && item.width > 0 ? item.width : 1;
+            const h = item.height && item.height > 0 ? item.height : 1;
+            const relativeH = h / w;
+            // 选当前最短列
+            let target = 0;
+            for (let i = 1; i < cols; i++) {
+              if (heights[i] < heights[target]) target = i;
+            }
+            buckets[target].push(item);
+            heights[target] += relativeH;
+          }
+          return buckets.map((bucket, colIdx) => (
+            <div
+              key={colIdx}
+              className="flex flex-1 flex-col gap-3"
+              style={{ minWidth: 0 }}
+            >
+              {bucket.map((item) => {
+                const ratio =
+                  item.width && item.height && item.width > 0 && item.height > 0
+                    ? item.width / item.height
+                    : 1;
+                const state = publishStates.get(imageKey(item));
+                return (
                   <button
+                    key={imageKey(item)}
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleFavorite(item);
-                    }}
-                    className={cn(
+                    onClick={() => setFocused(item)}
+                    className="group relative w-full cursor-pointer overflow-hidden rounded-2xl bg-secondary text-left transition-shadow duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none"
+                    style={{ aspectRatio: String(ratio) }}
+                  >
+                    {/* Star icon overlay */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleFavorite(item);
+                      }}
+                      className={cn(
                         "absolute top-2 right-2 z-10 grid size-8 cursor-pointer place-items-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-opacity duration-200",
                         isFavorited(item) ? "opacity-100 text-yellow-400" : "opacity-0 group-hover:opacity-100 hover:bg-black/60",
                       )}
@@ -800,7 +534,7 @@ function WorksPageContent() {
                       className="h-full w-full object-cover"
                     />
                     {state === "published" ? (
-                      <div className={cn("absolute top-2 rounded-md bg-emerald-500/95 px-2 py-1 text-[10.5px] font-semibold text-white shadow-sm z-10", isBatchMode ? "left-9" : "left-2")}>
+                      <div className="absolute top-2 left-2 rounded-md bg-emerald-500/95 px-2 py-1 text-[10.5px] font-semibold text-white shadow-sm">
                         已发布
                       </div>
                     ) : null}
@@ -822,7 +556,8 @@ function WorksPageContent() {
                 );
               })}
             </div>
-          ))}
+          ));
+        })()}
       </div>
 
       {/* 详情 Dialog */}
@@ -837,43 +572,13 @@ function WorksPageContent() {
                   把次要操作收到角落，底部只留 3 个主 CTA，避免按钮换行。
                   容器底色用 stone-900 兜底；图按容器宽度撑满，高度按比例自然展开，
                   高图由外层 DialogContent 的 max-h-[92vh] + overflow-y-auto 消化滚动。 */}
-              <div
-                className="relative bg-stone-900 select-none overflow-hidden"
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-              >
+              <div className="relative bg-stone-900">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={focusedView.url}
                   alt={focusedView.prompt?.slice(0, 30) || focusedView.name}
-                  className="block h-auto w-full pointer-events-none"
+                  className="block h-auto w-full"
                 />
-                {hasPrev ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      goPrev();
-                    }}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex size-9 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65 active:scale-90"
-                    title="上一张 (←)"
-                  >
-                    <ChevronLeft className="size-5" />
-                  </button>
-                ) : null}
-                {hasNext ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      goNext();
-                    }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex size-9 cursor-pointer items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition hover:bg-black/65 active:scale-90"
-                    title="下一张 (→)"
-                  >
-                    <ChevronRight className="size-5" />
-                  </button>
-                ) : null}
                 <div className="absolute top-3 right-3 flex items-center gap-1.5">
                   <button
                     type="button"
@@ -945,7 +650,7 @@ function WorksPageContent() {
 
                 {/* 底部 3 主 CTA 等分宽度，永远不换行；
                     下载/删除已移到图片右上角悬浮按钮。 */}
-                <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-3 gap-2">
                   <Button
                     onClick={() => handleRedraw(focusedView)}
                     className="h-10 w-full rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 px-3"
@@ -1050,92 +755,6 @@ function WorksPageContent() {
               disabled={deleting}
             >
               {deleting ? <LoaderCircle className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-              确认删除
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 批量操作悬浮条 */}
-      {isBatchMode && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-border bg-background/85 px-4 py-3 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.15)] backdrop-blur-md max-w-[95vw] sm:max-w-xl">
-          <div className="mr-2 text-xs font-medium text-muted-foreground whitespace-nowrap">
-            已选 <span className="font-semibold text-foreground font-data tabular-nums">{selectedPaths.length}</span> 张
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 rounded-lg text-xs"
-            onClick={() => {
-              const allKeys = displayedItems.map(imageKey);
-              const allSelected = displayedItems.length > 0 && displayedItems.every((item) => selectedSet.has(imageKey(item)));
-              togglePaths(allKeys, !allSelected);
-            }}
-          >
-            {displayedItems.length > 0 && displayedItems.every((item) => selectedSet.has(imageKey(item))) ? "取消全选" : "全选"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={selectedPaths.length === 0 || isDownloading}
-            className="h-8 rounded-lg text-xs gap-1 border-border"
-            onClick={handleBatchDownload}
-          >
-            {isDownloading ? <LoaderCircle className="size-3 animate-spin" /> : <Download className="size-3" />}
-            下载
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={selectedPaths.length === 0}
-            className="h-8 rounded-lg text-xs gap-1 border-border"
-            onClick={handleBatchFavorite}
-          >
-            <Star className="size-3" />
-            收藏
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={selectedPaths.length === 0 || isBatchPublishing}
-            className="h-8 rounded-lg text-xs gap-1 border-border"
-            onClick={handleBatchPublish}
-          >
-            {isBatchPublishing ? <LoaderCircle className="size-3 animate-spin" /> : <Share2 className="size-3" />}
-            发布
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={selectedPaths.length === 0}
-            className="h-8 rounded-lg text-xs gap-1 border-rose-200/50 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/20"
-            onClick={() => setIsBatchDeleteOpen(true)}
-          >
-            <Trash2 className="size-3" />
-            删除
-          </Button>
-        </div>
-      )}
-
-      {/* 批量删除二次确认 */}
-      <Dialog open={isBatchDeleteOpen} onOpenChange={setIsBatchDeleteOpen}>
-        <DialogContent showCloseButton={false} className="rounded-2xl p-6">
-          <DialogHeader>
-            <DialogTitle>确定删除选中的 {selectedPaths.length} 张图片？</DialogTitle>
-            <DialogDescription className="text-sm leading-6">
-              此操作将从云端彻底删除选中的图片，且不可恢复。确认删除吗？
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setIsBatchDeleteOpen(false)} disabled={isBatchDeleting}>
-              取消
-            </Button>
-            <Button
-              className="bg-rose-600 text-white hover:bg-rose-700"
-              onClick={handleConfirmBatchDelete}
-              disabled={isBatchDeleting}
-            >
-              {isBatchDeleting ? <LoaderCircle className="size-4 animate-spin mr-1.5" /> : null}
               确认删除
             </Button>
           </DialogFooter>
